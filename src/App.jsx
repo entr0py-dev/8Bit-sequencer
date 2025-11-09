@@ -6,8 +6,6 @@ const CELL = 28
 const GAP = 8
 const STEP_TIME = (bpm) => (60 / bpm) * 1000 / 4
 
-const defaultSamples = Array.from({ length: TRACKS }, (_, i) => "")
-
 export default function App() {
   const [grid, setGrid] = useState(() =>
     Array(TRACKS).fill(null).map(() => Array(STEPS).fill(false))
@@ -17,25 +15,20 @@ export default function App() {
   const [bpm, setBpm] = useState(120)
   const [samples, setSamples] = useState(() => {
     const saved = localStorage.getItem("samples")
-    return saved ? JSON.parse(saved) : defaultSamples
+    return saved ? JSON.parse(saved) : Array(TRACKS).fill("")
   })
 
-  const audioRefs = useRef([])
   const intervalRef = useRef(null)
+  const audioRefs = useRef([])
 
-  // update refs when sample list changes
-useEffect(() => {
-  audioRefs.current = samples.map((src, i) => {
-    const el = document.getElementById(`audio-${i}`)
-    // Force a load after user interaction to bypass autoplay block
-    if (el) {
-      el.load()
+  // Keep refs in sync with sample count
+  useEffect(() => {
+    audioRefs.current = audioRefs.current.slice(0, samples.length)
+    while (audioRefs.current.length < samples.length) {
+      audioRefs.current.push(React.createRef())
     }
-    return el
-  })
-  localStorage.setItem("samples", JSON.stringify(samples))
-}, [samples])
-
+    localStorage.setItem("samples", JSON.stringify(samples))
+  }, [samples])
 
   const toggleStep = (row, col) => {
     const copy = grid.map((r) => [...r])
@@ -44,11 +37,15 @@ useEffect(() => {
   }
 
   const playStep = (current) => {
-    grid.forEach((row, rowIndex) => {
-      if (row[current] && audioRefs.current[rowIndex]) {
-        const audio = audioRefs.current[rowIndex]
-        audio.currentTime = 0
-        audio.play().catch(() => {})
+    grid.forEach((row, trackIndex) => {
+      if (row[current]) {
+        const ref = audioRefs.current[trackIndex]
+        if (ref && ref.current) {
+          ref.current.currentTime = 0
+          ref.current.play().catch((e) => {
+            console.warn("Playback failed", e)
+          })
+        }
       }
     })
   }
@@ -59,13 +56,14 @@ useEffect(() => {
       return
     }
 
+    const interval = STEP_TIME(bpm)
     intervalRef.current = setInterval(() => {
       setStep((prev) => {
         const next = (prev + 1) % STEPS
         playStep(next)
         return next
       })
-    }, STEP_TIME(bpm))
+    }, interval)
 
     return () => clearInterval(intervalRef.current)
   }, [isPlaying, bpm, grid])
@@ -81,7 +79,12 @@ useEffect(() => {
       {/* Audio elements */}
       {samples.map((src, i) =>
         src ? (
-          <audio key={i} id={`audio-${i}`} src={src} preload="auto" />
+          <audio
+            key={i}
+            ref={audioRefs.current[i]}
+            src={src}
+            preload="auto"
+          />
         ) : null
       )}
 
