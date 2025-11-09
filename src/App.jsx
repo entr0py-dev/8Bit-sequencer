@@ -1,22 +1,10 @@
 import React, { useEffect, useRef, useState } from "react"
 
-
 const TRACKS = 8
 const STEPS = 16
 const CELL = 32
 const GAP = 6
 const STEP_TIME = (bpm) => (60 / bpm) * 1000 / 4
-
-const sampleOptions = [
-  "kick.mp3",
-  "snare.mp3",
-  "hat.mp3",
-  "clap.mp3",
-  "tom.mp3",
-  "bass.mp3",
-  "chord.mp3",
-  "lead.mp3",
-]
 
 export default function App() {
   const [grid, setGrid] = useState(() =>
@@ -25,23 +13,40 @@ export default function App() {
   const [step, setStep] = useState(0)
   const [isPlaying, setIsPlaying] = useState(false)
   const [bpm, setBpm] = useState(120)
-  const [samples, setSamples] = useState(() => {
-    const saved = localStorage.getItem("samples")
-    return saved ? JSON.parse(saved) : Array(TRACKS).fill("kick.mp3")
-  })
+  const [samples, setSamples] = useState(() =>
+    Array(TRACKS).fill("")
+  )
   const [volumes, setVolumes] = useState(() =>
     Array(TRACKS).fill(1)
   )
+  const [availableSamples, setAvailableSamples] = useState([])
 
   const intervalRef = useRef(null)
   const audioRefs = useRef([])
 
+  // Fetch available sample files from server (auto-detect .mp3/.wav)
+  useEffect(() => {
+    fetch("/")
+      .then((res) => res.text())
+      .then((html) => {
+        const matches = Array.from(html.matchAll(/href="([^"]+\.(mp3|wav))"/g))
+        const filenames = matches.map((m) => decodeURIComponent(m[1]).replace("/", ""))
+        const unique = Array.from(new Set(filenames))
+        setAvailableSamples(unique)
+        // Set default sample if blank
+        setSamples((prev) => prev.map((val, i) => val || unique[0] || ""))
+      })
+      .catch((e) => {
+        console.warn("Could not load available samples:", e)
+      })
+  }, [])
+
+  // Maintain audio refs
   useEffect(() => {
     audioRefs.current = audioRefs.current.slice(0, samples.length)
     while (audioRefs.current.length < samples.length) {
       audioRefs.current.push(React.createRef())
     }
-    localStorage.setItem("samples", JSON.stringify(samples))
   }, [samples])
 
   const toggleStep = (row, col) => {
@@ -114,14 +119,16 @@ export default function App() {
         @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
       `}</style>
 
-      {samples.map((src, i) => (
-        <audio
-          key={i}
-          ref={audioRefs.current[i]}
-          src={`/${src}`}
-          preload="auto"
-        />
-      ))}
+      {samples.map((src, i) =>
+        src ? (
+          <audio
+            key={i}
+            ref={audioRefs.current[i]}
+            src={`/${src}`}
+            preload="auto"
+          />
+        ) : null
+      )}
 
       {/* Controls */}
       <div style={{ marginBottom: 24, display: "flex", alignItems: "center", gap: 16 }}>
@@ -178,9 +185,9 @@ export default function App() {
                 fontSize: 10,
               }}
             >
-              {sampleOptions.map((opt) => (
-                <option key={opt} value={opt}>
-                  {opt.replace(".mp3", "").toUpperCase()}
+              {availableSamples.map((file) => (
+                <option key={file} value={file}>
+                  {file.replace(/\.(mp3|wav)/, "").toUpperCase()}
                 </option>
               ))}
             </select>
