@@ -24,22 +24,17 @@ export default function App() {
   const intervalRef = useRef(null)
   const audioRefs = useRef([])
 
-  // Fetch available sample files from server (auto-detect .mp3/.wav)
-  useEffect(() => {
-    fetch("/")
-      .then((res) => res.text())
-      .then((html) => {
-        const matches = Array.from(html.matchAll(/href="([^"]+\.(mp3|wav))"/g))
-        const filenames = matches.map((m) => decodeURIComponent(m[1]).replace("/", ""))
-        const unique = Array.from(new Set(filenames))
-        setAvailableSamples(unique)
-        // Set default sample if blank
-        setSamples((prev) => prev.map((val, i) => val || unique[0] || ""))
-      })
-      .catch((e) => {
-        console.warn("Could not load available samples:", e)
-      })
-  }, [])
+  // Load available samples from public/samples.json
+useEffect(() => {
+  fetch("/samples.json")
+    .then(res => res.json())
+    .then(files => {
+      setAvailableSamples(files)
+      setSamples(prev => prev.map((val) => val || files[0] || ""))
+    })
+    .catch(e => console.warn("Could not load samples.json", e))
+}, [])
+
 
   // Maintain audio refs
   useEffect(() => {
