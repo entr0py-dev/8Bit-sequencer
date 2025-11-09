@@ -1,10 +1,22 @@
 import React, { useEffect, useRef, useState } from "react"
+import "./styles.css" // Optional: If using external styles later
 
 const TRACKS = 8
 const STEPS = 16
-const CELL = 28
-const GAP = 8
+const CELL = 32
+const GAP = 6
 const STEP_TIME = (bpm) => (60 / bpm) * 1000 / 4
+
+const sampleOptions = [
+  "kick.mp3",
+  "snare.mp3",
+  "hat.mp3",
+  "clap.mp3",
+  "tom.mp3",
+  "bass.mp3",
+  "chord.mp3",
+  "lead.mp3",
+]
 
 export default function App() {
   const [grid, setGrid] = useState(() =>
@@ -15,13 +27,15 @@ export default function App() {
   const [bpm, setBpm] = useState(120)
   const [samples, setSamples] = useState(() => {
     const saved = localStorage.getItem("samples")
-    return saved ? JSON.parse(saved) : Array(TRACKS).fill("")
+    return saved ? JSON.parse(saved) : Array(TRACKS).fill("kick.mp3")
   })
+  const [volumes, setVolumes] = useState(() =>
+    Array(TRACKS).fill(1)
+  )
 
   const intervalRef = useRef(null)
   const audioRefs = useRef([])
 
-  // Maintain audio refs when sample count changes
   useEffect(() => {
     audioRefs.current = audioRefs.current.slice(0, samples.length)
     while (audioRefs.current.length < samples.length) {
@@ -42,9 +56,9 @@ export default function App() {
         const ref = audioRefs.current[trackIndex]
         if (ref?.current) {
           try {
+            ref.current.volume = volumes[trackIndex]
             ref.current.currentTime = 0
             ref.current.play()
-            console.log(`Playing track ${trackIndex + 1}`)
           } catch (e) {
             console.warn(`Track ${trackIndex + 1} failed to play`, e)
           }
@@ -59,67 +73,76 @@ export default function App() {
       return
     }
 
-    const interval = STEP_TIME(bpm)
     intervalRef.current = setInterval(() => {
       setStep((prev) => {
         const next = (prev + 1) % STEPS
         playStep(next)
         return next
       })
-    }, interval)
+    }, STEP_TIME(bpm))
 
     return () => clearInterval(intervalRef.current)
-  }, [isPlaying, bpm, grid])
+  }, [isPlaying, bpm, grid, volumes])
 
   const handleSampleChange = (index, value) => {
     const updated = [...samples]
     updated[index] = value
     setSamples(updated)
-    // Force reload of audio
     setTimeout(() => {
       const audio = audioRefs.current[index]?.current
-      if (audio) {
-        audio.load()
-        console.log(`Reloaded audio track ${index + 1}`)
-      }
+      if (audio) audio.load()
     }, 100)
   }
 
+  const handleVolumeChange = (index, value) => {
+    const updated = [...volumes]
+    updated[index] = parseFloat(value)
+    setVolumes(updated)
+  }
+
   return (
-    <div style={{ background: "#111", color: "#fff", minHeight: "100vh", padding: 20, fontFamily: "monospace" }}>
-      {/* Audio Elements */}
-      {samples.map((src, i) =>
-        src ? (
-          <audio
-            key={i}
-            ref={audioRefs.current[i]}
-            src={src}
-            preload="auto"
-            onLoadedData={() => console.log(`Track ${i + 1} loaded`)}
-            onError={() => console.warn(`Track ${i + 1} failed to load`)}
-          />
-        ) : null
-      )}
+    <div
+      style={{
+        background: "linear-gradient(145deg, #080808, #1a1a1a)",
+        color: "#0ff",
+        minHeight: "100vh",
+        padding: 20,
+        fontFamily: "'Press Start 2P', monospace",
+      }}
+    >
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+      `}</style>
+
+      {samples.map((src, i) => (
+        <audio
+          key={i}
+          ref={audioRefs.current[i]}
+          src={`/${src}`}
+          preload="auto"
+        />
+      ))}
 
       {/* Controls */}
-      <div style={{ marginBottom: 20 }}>
+      <div style={{ marginBottom: 24, display: "flex", alignItems: "center", gap: 16 }}>
         <button
           onClick={() => setIsPlaying(!isPlaying)}
           style={{
             background: isPlaying ? "#ff0033" : "#00ff00",
             color: "#000",
             fontWeight: "bold",
-            fontSize: 16,
-            padding: "8px 16px",
-            border: "none",
+            fontSize: 14,
+            padding: "10px 20px",
+            border: "3px solid #0ff",
+            boxShadow: "0 0 10px #0ff",
             cursor: "pointer",
-            marginRight: 16,
+            fontFamily: "inherit",
           }}
         >
           {isPlaying ? "STOP" : "PLAY"}
         </button>
 
-        <label style={{ marginRight: 8 }}>BPM:</label>
+        <label>BPM:</label>
         <input
           type="number"
           value={bpm}
@@ -128,35 +151,50 @@ export default function App() {
           onChange={(e) => setBpm(Number(e.target.value))}
           style={{
             width: 60,
-            padding: "6px 8px",
-            fontFamily: "monospace",
-            fontSize: 14,
-            border: "1px solid #333",
-            background: "#222",
-            color: "#fff",
+            padding: "6px 10px",
+            background: "#111",
+            border: "2px solid #0ff",
+            color: "#0ff",
+            fontFamily: "inherit",
           }}
         />
       </div>
 
-      {/* Sample Inputs */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 20 }}>
+      {/* Track Controls */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, marginBottom: 32 }}>
         {samples.map((sample, i) => (
           <div key={i}>
-            <label>Track {i + 1}:</label>
-            <input
-              type="text"
-              placeholder="Paste sample URL"
+            <div style={{ marginBottom: 6, fontSize: 10 }}>Track {i + 1}</div>
+            <select
               value={sample}
               onChange={(e) => handleSampleChange(i, e.target.value)}
               style={{
                 width: "100%",
-                marginTop: 4,
                 padding: "6px 8px",
-                fontFamily: "monospace",
-                fontSize: 14,
-                background: "#222",
-                border: "1px solid #333",
-                color: "#fff",
+                background: "#111",
+                border: "2px solid #0ff",
+                color: "#0ff",
+                fontFamily: "inherit",
+                fontSize: 10,
+              }}
+            >
+              {sampleOptions.map((opt) => (
+                <option key={opt} value={opt}>
+                  {opt.replace(".mp3", "").toUpperCase()}
+                </option>
+              ))}
+            </select>
+            <input
+              type="range"
+              min="0"
+              max="1"
+              step="0.01"
+              value={volumes[i]}
+              onChange={(e) => handleVolumeChange(i, e.target.value)}
+              style={{
+                width: "100%",
+                marginTop: 4,
+                accentColor: "#0ff",
               }}
             />
           </div>
@@ -170,11 +208,11 @@ export default function App() {
             const isCurrent = step === colIndex
             const background = isCurrent
               ? isActive
-                ? "#00ffff"
-                : "#444"
+                ? "#ff00ff"
+                : "#333"
               : isActive
-              ? "#fff200"
-              : "#222"
+              ? "#00ffff"
+              : "#111"
 
             return (
               <div
@@ -189,8 +227,8 @@ export default function App() {
                   background,
                   border: "2px solid #000",
                   boxShadow: isCurrent
-                    ? "0px 0px 6px 2px #0ff"
-                    : "inset 0px 0px 2px #000",
+                    ? "0 0 6px 2px #f0f"
+                    : "inset 0 0 4px #000",
                   cursor: "pointer",
                 }}
               />
