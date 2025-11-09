@@ -21,7 +21,7 @@ export default function App() {
   const intervalRef = useRef(null)
   const audioRefs = useRef([])
 
-  // Keep refs in sync with sample count
+  // Maintain audio refs when sample count changes
   useEffect(() => {
     audioRefs.current = audioRefs.current.slice(0, samples.length)
     while (audioRefs.current.length < samples.length) {
@@ -40,11 +40,14 @@ export default function App() {
     grid.forEach((row, trackIndex) => {
       if (row[current]) {
         const ref = audioRefs.current[trackIndex]
-        if (ref && ref.current) {
-          ref.current.currentTime = 0
-          ref.current.play().catch((e) => {
-            console.warn("Playback failed", e)
-          })
+        if (ref?.current) {
+          try {
+            ref.current.currentTime = 0
+            ref.current.play()
+            console.log(`Playing track ${trackIndex + 1}`)
+          } catch (e) {
+            console.warn(`Track ${trackIndex + 1} failed to play`, e)
+          }
         }
       }
     })
@@ -72,11 +75,19 @@ export default function App() {
     const updated = [...samples]
     updated[index] = value
     setSamples(updated)
+    // Force reload of audio
+    setTimeout(() => {
+      const audio = audioRefs.current[index]?.current
+      if (audio) {
+        audio.load()
+        console.log(`Reloaded audio track ${index + 1}`)
+      }
+    }, 100)
   }
 
   return (
     <div style={{ background: "#111", color: "#fff", minHeight: "100vh", padding: 20, fontFamily: "monospace" }}>
-      {/* Audio elements */}
+      {/* Audio Elements */}
       {samples.map((src, i) =>
         src ? (
           <audio
@@ -84,6 +95,8 @@ export default function App() {
             ref={audioRefs.current[i]}
             src={src}
             preload="auto"
+            onLoadedData={() => console.log(`Track ${i + 1} loaded`)}
+            onError={() => console.warn(`Track ${i + 1} failed to load`)}
           />
         ) : null
       )}
