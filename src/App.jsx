@@ -24,12 +24,18 @@ export default function App() {
   const intervalRef = useRef(null)
 
   // update refs when sample list changes
-  useEffect(() => {
-    audioRefs.current = samples.map((src, i) =>
-      document.getElementById(`audio-${i}`)
-    )
-    localStorage.setItem("samples", JSON.stringify(samples))
-  }, [samples])
+useEffect(() => {
+  audioRefs.current = samples.map((src, i) => {
+    const el = document.getElementById(`audio-${i}`)
+    // Force a load after user interaction to bypass autoplay block
+    if (el) {
+      el.load()
+    }
+    return el
+  })
+  localStorage.setItem("samples", JSON.stringify(samples))
+}, [samples])
+
 
   const toggleStep = (row, col) => {
     const copy = grid.map((r) => [...r])
