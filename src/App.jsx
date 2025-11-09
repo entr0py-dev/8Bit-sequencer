@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react"
-import "./styles.css" // Optional: If using external styles later
+
 
 const TRACKS = 8
 const STEPS = 16
