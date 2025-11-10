@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useCallback } from "react"
+import React, { useEffect, useState, useRef, useCallback } from "react"
 
 const TRACKS = 8
 const STEPS = 16
@@ -54,14 +54,13 @@ export default function App() {
   const [volumes, setVolumes] = useState(() =>
     Array(TRACKS).fill(1)
   )
-  const [availableSamples, setAvailableSamples] = useState([])
   const [muted, setMuted] = useState(() =>
     Array(TRACKS).fill(false)
   )
   const [triggeredSteps, setTriggeredSteps] = useState(Array(TRACKS).fill(false))
+  const [availableSamples, setAvailableSamples] = useState([])
 
   const intervalRef = useRef(null)
-  const audioRefs = useRef([])
 
   useEffect(() => {
     fetch("/samples.json")
@@ -75,11 +74,6 @@ export default function App() {
       })
   }, [])
 
-  // Sync refs on samples
-  useEffect(() => {
-    audioRefs.current = samples.map((_, i) => React.createRef())
-  }, [samples])
-
   const toggleStep = useCallback((row, col) => {
     setGrid((prev) => {
       const copy = prev.map((r) => [...r])
@@ -92,16 +86,13 @@ export default function App() {
     const newTriggers = Array(TRACKS).fill(false)
 
     grid.forEach((row, trackIndex) => {
-      const ref = audioRefs.current[trackIndex]?.current
-      if (row[current] && ref && !muted[trackIndex]) {
-        try {
-          ref.pause()
-          ref.currentTime = 0
-          ref.volume = volumes[trackIndex]
-          ref.play()
+      if (row[current] && !muted[trackIndex]) {
+        const file = samples[trackIndex]
+        if (file) {
+          const audio = new Audio(`/${file}`)
+          audio.volume = volumes[trackIndex]
+          audio.play().catch(() => {})
           newTriggers[trackIndex] = true
-        } catch (e) {
-          console.warn(`Track ${trackIndex + 1} failed to play`, e)
         }
       }
     })
@@ -124,16 +115,12 @@ export default function App() {
     }, STEP_TIME(bpm))
 
     return () => clearInterval(intervalRef.current)
-  }, [isPlaying, bpm, grid, volumes, muted])
+  }, [isPlaying, bpm, grid, volumes, muted, samples])
 
   const updateSample = (index, value) => {
     const updated = [...samples]
     updated[index] = value
     setSamples(updated)
-    setTimeout(() => {
-      const audio = audioRefs.current[index]?.current
-      if (audio) audio.load()
-    }, 100)
   }
 
   const debouncedUpdateSample = useCallback(debounce(updateSample, 100), [])
@@ -170,18 +157,6 @@ export default function App() {
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
       `}</style>
-
-      {/* Audio elements */}
-      {samples.map((src, i) =>
-        src ? (
-          <audio
-            key={`${i}-${src}`}
-            ref={audioRefs.current[i]}
-            src={`/${src}`}
-            preload="auto"
-          />
-        ) : null
-      )}
 
       {/* Top controls */}
       <div style={{ marginBottom: 24, display: "flex", alignItems: "center", gap: 16 }}>
@@ -306,7 +281,7 @@ export default function App() {
           )}
         </div>
 
-        {/* VU meters — positioned to the right */}
+        {/* VU meters */}
         <div style={{ marginLeft: 48, display: "flex", flexDirection: "column", gap: GAP }}>
           {triggeredSteps.map((active, i) => (
             <div
