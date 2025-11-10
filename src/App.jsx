@@ -28,21 +28,32 @@ export default function App() {
 
   const getStepTime = () => (60 / bpm) * 1000 / 4
 
-  const initAudio = async () => {
-    if (!audioCtxRef.current) {
-      const AudioContext = window.AudioContext || window.webkitAudioContext
-      audioCtxRef.current = new AudioContext()
-    }
-    const ctx = audioCtxRef.current
-    for (const sample of samples) {
-      if (!sampleBuffersRef.current[sample] && sample) {
+const initAudio = async () => {
+  if (!audioCtxRef.current) {
+    const AudioContext = window.AudioContext || window.webkitAudioContext
+    audioCtxRef.current = new AudioContext()
+  }
+
+  // ✅ Ensure the context is allowed to run in Vercel/production
+  if (audioCtxRef.current.state === "suspended") {
+    await audioCtxRef.current.resume()
+  }
+
+  const ctx = audioCtxRef.current
+  for (const sample of samples) {
+    if (!sampleBuffersRef.current[sample] && sample) {
+      try {
         const res = await fetch(`/${sample}`)
         const arrayBuffer = await res.arrayBuffer()
         const audioBuffer = await ctx.decodeAudioData(arrayBuffer)
         sampleBuffersRef.current[sample] = audioBuffer
+      } catch (e) {
+        console.error("Failed to load audio:", e)
       }
     }
   }
+}
+
 
   const playSample = (sample, volume = 1, pitch = 1) => {
     const ctx = audioCtxRef.current
