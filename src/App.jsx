@@ -331,14 +331,16 @@ const savePattern = () => {
   // Skip fetch if it's a user-uploaded sample
   if (userSamples[e.target.value]) return
 
-  const res = await fetch(`/${e.target.value}`)
-  const buf = await res.arrayBuffer()
-  const decoded = await audioCtxRef.current.decodeAudioData(buf)
-  sampleBuffersRef.current[e.target.value] = decoded
-}
- catch (err) {
+  try {
+    const res = await fetch(`/${e.target.value}`)
+    const buf = await res.arrayBuffer()
+    const decoded = await audioCtxRef.current.decodeAudioData(buf)
+    sampleBuffersRef.current[e.target.value] = decoded
+  } catch (err) {
     console.error("Failed to load sample:", err)
   }
+}
+
 }}
 
               style={{
