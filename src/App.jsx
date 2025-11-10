@@ -108,9 +108,16 @@ export default function App() {
   }, [isPlaying, bpm, grid, samples, volumes, muted, pitches, swing])
 
   const handlePlayToggle = async () => {
-    await initAudio()
-    setIsPlaying((prev) => !prev)
+  await initAudio()
+
+  // ✅ Fix: ensure audio context resumes on user interaction
+  if (audioCtxRef.current?.state === "suspended") {
+    await audioCtxRef.current.resume()
   }
+
+  setIsPlaying((prev) => !prev)
+}
+
 
   const savePattern = () => {
     const pattern = {
