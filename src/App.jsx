@@ -76,10 +76,7 @@ export default function App() {
   }, [])
 
   useEffect(() => {
-    audioRefs.current = audioRefs.current.slice(0, samples.length)
-    while (audioRefs.current.length < samples.length) {
-      audioRefs.current.push(React.createRef())
-    }
+    audioRefs.current = samples.map(() => React.createRef())
   }, [samples])
 
   const toggleStep = useCallback((row, col) => {
@@ -166,6 +163,7 @@ export default function App() {
         minHeight: "100vh",
         padding: 20,
         fontFamily: "'Press Start 2P', monospace",
+        overflowX: "auto",
       }}
     >
       <style>{`
@@ -175,7 +173,7 @@ export default function App() {
       {samples.map((src, i) =>
         src ? (
           <audio
-            key={i}
+            key={`${i}-${src}`}
             ref={audioRefs.current[i]}
             src={`/${src}`}
             preload="none"
@@ -224,7 +222,6 @@ export default function App() {
           <div key={i} style={{ position: "relative" }}>
             <div style={{ marginBottom: 6, fontSize: 10 }}>Track {i + 1}</div>
 
-            {/* Note Label */}
             <div
               style={{
                 fontSize: 10,
@@ -269,7 +266,6 @@ export default function App() {
               }}
             />
 
-            {/* Mute Button */}
             <button
               onClick={() => toggleMute(i)}
               style={{
@@ -284,42 +280,57 @@ export default function App() {
             >
               {muted[i] ? "MUTED" : "MUTE"}
             </button>
-
-            {/* Animated Meter */}
-            <div
-              style={{
-                height: 6,
-                marginTop: 6,
-                background: "#000",
-                overflow: "hidden",
-              }}
-            >
-              <div
-                style={{
-                  height: 6,
-                  width: triggeredSteps[i] ? "100%" : "0%",
-                  transition: "width 100ms ease-out",
-                  background: "#0ff",
-                }}
-              />
-            </div>
           </div>
         ))}
       </div>
 
-      <div style={{ position: "relative" }}>
-        {grid.map((row, rowIndex) =>
-          row.map((isActive, colIndex) => (
-            <Cell
-              key={`${rowIndex}-${colIndex}`}
-              isActive={isActive}
-              isCurrent={step === colIndex}
-              row={rowIndex}
-              col={colIndex}
-              onClick={() => toggleStep(rowIndex, colIndex)}
-            />
-          ))
-        )}
+      <div style={{ position: "relative", display: "flex" }}>
+        <div style={{ position: "relative", width: STEPS * (CELL + GAP) }}>
+          {grid.map((row, rowIndex) =>
+            row.map((isActive, colIndex) => (
+              <Cell
+                key={`${rowIndex}-${colIndex}`}
+                isActive={isActive}
+                isCurrent={step === colIndex}
+                row={rowIndex}
+                col={colIndex}
+                onClick={() => toggleStep(rowIndex, colIndex)}
+              />
+            ))
+          )}
+        </div>
+
+        {/* VU meters */}
+        <div style={{ marginLeft: 16, display: "flex", flexDirection: "column", justifyContent: "center", gap: GAP }}>
+          {triggeredSteps.map((active, i) => (
+            <div key={i} style={{ display: "flex", flexDirection: "column", height: CELL, justifyContent: "space-between" }}>
+              <div
+                style={{
+                  width: 8,
+                  height: 6,
+                  background: active ? "red" : "#200",
+                  transition: "all 120ms ease",
+                }}
+              />
+              <div
+                style={{
+                  width: 8,
+                  height: 6,
+                  background: active ? "yellow" : "#220",
+                  transition: "all 120ms ease",
+                }}
+              />
+              <div
+                style={{
+                  width: 8,
+                  height: 6,
+                  background: active ? "lime" : "#040",
+                  transition: "all 120ms ease",
+                }}
+              />
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   )
