@@ -14,7 +14,6 @@ const debounce = (fn, delay) => {
   }
 }
 
-// === Memoized Cell ===
 const Cell = React.memo(({ isActive, isCurrent, onClick, row, col }) => {
   const background = isCurrent
     ? isActive
@@ -35,9 +34,7 @@ const Cell = React.memo(({ isActive, isCurrent, onClick, row, col }) => {
         left: col * (CELL + GAP),
         background,
         border: "2px solid #000",
-        boxShadow: isCurrent
-          ? "0 0 6px 2px #f0f"
-          : "inset 0 0 4px #000",
+        boxShadow: isCurrent ? "0 0 6px 2px #f0f" : "inset 0 0 4px #000",
         cursor: "pointer",
       }}
     />
@@ -50,7 +47,7 @@ export default function App() {
   )
   const [step, setStep] = useState(0)
   const [isPlaying, setIsPlaying] = useState(false)
-  const [bpm, setBpm] = useState(120)
+  const [bpm, setBpm] = useState(87)
   const [samples, setSamples] = useState(() =>
     Array(TRACKS).fill("")
   )
@@ -58,6 +55,10 @@ export default function App() {
     Array(TRACKS).fill(1)
   )
   const [availableSamples, setAvailableSamples] = useState([])
+  const [muted, setMuted] = useState(() =>
+    Array(TRACKS).fill(false)
+  )
+  const [triggeredSteps, setTriggeredSteps] = useState(Array(TRACKS).fill(false))
 
   const intervalRef = useRef(null)
   const audioRefs = useRef([])
@@ -90,20 +91,24 @@ export default function App() {
   }, [])
 
   const playStep = (current) => {
+    const newTriggers = Array(TRACKS).fill(false)
+
     grid.forEach((row, trackIndex) => {
-      if (row[current]) {
-        const ref = audioRefs.current[trackIndex]
-        if (ref?.current) {
-          try {
-            ref.current.volume = volumes[trackIndex]
-            ref.current.currentTime = 0
-            ref.current.play()
-          } catch (e) {
-            console.warn(`Track ${trackIndex + 1} failed to play`, e)
-          }
+      const ref = audioRefs.current[trackIndex]?.current
+      if (row[current] && ref && !muted[trackIndex]) {
+        try {
+          ref.pause()
+          ref.currentTime = 0
+          ref.volume = volumes[trackIndex]
+          ref.play()
+          newTriggers[trackIndex] = true
+        } catch (e) {
+          console.warn(`Track ${trackIndex + 1} failed to play`, e)
         }
       }
     })
+
+    setTriggeredSteps(newTriggers)
   }
 
   useEffect(() => {
@@ -121,7 +126,7 @@ export default function App() {
     }, STEP_TIME(bpm))
 
     return () => clearInterval(intervalRef.current)
-  }, [isPlaying, bpm, grid, volumes])
+  }, [isPlaying, bpm, grid, volumes, muted])
 
   const updateSample = (index, value) => {
     const updated = [...samples]
@@ -144,6 +149,14 @@ export default function App() {
     }, 100),
     []
   )
+
+  const toggleMute = (index) => {
+    setMuted((prev) => {
+      const copy = [...prev]
+      copy[index] = !copy[index]
+      return copy
+    })
+  }
 
   return (
     <div
@@ -208,8 +221,20 @@ export default function App() {
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, marginBottom: 32 }}>
         {samples.map((sample, i) => (
-          <div key={i}>
+          <div key={i} style={{ position: "relative" }}>
             <div style={{ marginBottom: 6, fontSize: 10 }}>Track {i + 1}</div>
+
+            {/* Note Label */}
+            <div
+              style={{
+                fontSize: 10,
+                color: muted[i] ? "#888" : "#0ff",
+                marginBottom: 4,
+              }}
+            >
+              {sample.replace(/\.(mp3|wav)/, "").toUpperCase()}
+            </div>
+
             <select
               defaultValue={sample}
               onChange={(e) => debouncedUpdateSample(i, e.target.value)}
@@ -229,6 +254,7 @@ export default function App() {
                 </option>
               ))}
             </select>
+
             <input
               type="range"
               min="0"
@@ -242,6 +268,41 @@ export default function App() {
                 accentColor: "#0ff",
               }}
             />
+
+            {/* Mute Button */}
+            <button
+              onClick={() => toggleMute(i)}
+              style={{
+                marginTop: 4,
+                fontSize: 10,
+                background: muted[i] ? "#444" : "#0ff",
+                color: muted[i] ? "#ccc" : "#000",
+                border: "2px solid #000",
+                cursor: "pointer",
+                width: "100%",
+              }}
+            >
+              {muted[i] ? "MUTED" : "MUTE"}
+            </button>
+
+            {/* Animated Meter */}
+            <div
+              style={{
+                height: 6,
+                marginTop: 6,
+                background: "#000",
+                overflow: "hidden",
+              }}
+            >
+              <div
+                style={{
+                  height: 6,
+                  width: triggeredSteps[i] ? "100%" : "0%",
+                  transition: "width 100ms ease-out",
+                  background: "#0ff",
+                }}
+              />
+            </div>
           </div>
         ))}
       </div>
