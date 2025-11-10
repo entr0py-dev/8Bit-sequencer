@@ -40,20 +40,7 @@ const initAudio = async () => {
 }
 
 
-  const ctx = audioCtxRef.current
-  for (const sample of samples) {
-    if (!sampleBuffersRef.current[sample] && sample) {
-      try {
-        const res = await fetch(`/${sample}`)
-        const arrayBuffer = await res.arrayBuffer()
-        const audioBuffer = await ctx.decodeAudioData(arrayBuffer)
-        sampleBuffersRef.current[sample] = audioBuffer
-      } catch (e) {
-        console.error("Failed to load audio:", e)
-      }
-    }
-  }
-}
+ 
 
 
   const playSample = (sample, volume = 1, pitch = 1) => {
