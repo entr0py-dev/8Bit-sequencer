@@ -56,6 +56,15 @@ const initAudio = async () => {
     source.start()
   }
 
+  const toggleStep = (row, col) => {
+  setGrid((prev) => {
+    const copy = prev.map((r) => [...r])
+    copy[row][col] = !copy[row][col]
+    return copy
+  })
+}
+
+  
   const playStep = async (currentStep) => {
   const stepTime = getStepTime()
   const newTriggers = Array(TRACKS).fill(false)
