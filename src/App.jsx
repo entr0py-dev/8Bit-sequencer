@@ -1,14 +1,9 @@
-// ✅ Features:
-// - Smaller steps with spacing
-// - Fixed layout (90% of 1390x1000)
-// - Theme switcher with gradient button
-// - Save/Load pattern via localStorage
-// - Everything else from previous version still works
-
 import React, { useEffect, useState, useRef } from "react"
 
 const TRACKS = 8
 const STEPS = 16
+const STEP_GAP = 4
+const CELL_SIZE = 28
 
 export default function App() {
   const [grid, setGrid] = useState(() =>
@@ -97,7 +92,6 @@ export default function App() {
         setSamples((prev) => prev.map((s, i) => s || files[0] || ""))
       })
   }, [])
-
   useEffect(() => {
     if (!isPlaying) {
       clearInterval(intervalRef.current)
@@ -158,7 +152,6 @@ export default function App() {
   }
 
   const themeStyles = colors[theme]
-  const cellSize = 28
 
   return (
     <div
@@ -238,9 +231,7 @@ export default function App() {
         </button>
 
         <button
-          onClick={() =>
-            setTheme((prev) => (prev === "synthwave" ? "crt" : "synthwave"))
-          }
+          onClick={() => setTheme((prev) => (prev === "synthwave" ? "crt" : "synthwave"))}
           style={{
             marginLeft: "auto",
             width: 40,
@@ -252,9 +243,110 @@ export default function App() {
         />
       </div>
 
+      {/* Track Controls */}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 16, marginBottom: 24 }}>
+        {samples.map((sample, i) => (
+          <div key={i} style={{ width: 220 }}>
+            <div style={{ fontSize: 10, marginBottom: 4 }}>Track {i + 1}</div>
+
+            <select
+              value={sample}
+              onChange={(e) => {
+                const newSamples = [...samples]
+                newSamples[i] = e.target.value
+                setSamples(newSamples)
+                fetch(`/${e.target.value}`)
+                  .then((res) => res.arrayBuffer())
+                  .then((buf) =>
+                    audioCtxRef.current.decodeAudioData(buf).then((decoded) => {
+                      sampleBuffersRef.current[e.target.value] = decoded
+                    })
+                  )
+              }}
+              style={{
+                width: "100%",
+                padding: 4,
+                background: "#111",
+                color: themeStyles.text,
+                fontFamily: "inherit",
+              }}
+            >
+              {availableSamples.map((file) => (
+                <option key={file} value={file}>
+                  {file.replace(/\.(mp3|wav)/, "").toUpperCase()}
+                </option>
+              ))}
+            </select>
+
+            <div style={{ fontSize: 10, marginTop: 6 }}>Volume</div>
+            <input
+              type="range"
+              min="0"
+              max="1"
+              step="0.01"
+              value={volumes[i]}
+              onChange={(e) => {
+                const newVolumes = [...volumes]
+                newVolumes[i] = parseFloat(e.target.value)
+                setVolumes(newVolumes)
+              }}
+              style={{ width: "100%" }}
+            />
+
+            <div style={{ fontSize: 10, marginTop: 6 }}>Pitch</div>
+            <input
+              type="range"
+              min="0.5"
+              max="2"
+              step="0.01"
+              value={pitches[i]}
+              onChange={(e) => {
+                const newPitches = [...pitches]
+                newPitches[i] = parseFloat(e.target.value)
+                setPitches(newPitches)
+              }}
+              style={{ width: "100%" }}
+            />
+
+            <div style={{ marginTop: 6 }}>
+              <label style={{ fontSize: 10 }}>
+                <input
+                  type="checkbox"
+                  checked={swing[i]}
+                  onChange={() => {
+                    const newSwing = [...swing]
+                    newSwing[i] = !newSwing[i]
+                    setSwing(newSwing)
+                  }}
+                  style={{ marginRight: 4 }}
+                />
+                Swing
+              </label>
+            </div>
+
+            <button
+              onClick={() => {
+                const newMuted = [...muted]
+                newMuted[i] = !newMuted[i]
+                setMuted(newMuted)
+              }}
+              style={{
+                marginTop: 4,
+                width: "100%",
+                background: muted[i] ? "#444" : themeStyles.highlight,
+                color: muted[i] ? "#aaa" : themeStyles.bg,
+                border: "2px solid #000",
+                fontSize: 10,
+              }}
+            >
+              {muted[i] ? "MUTED" : "MUTE"}
+            </button>
+          </div>
+        ))}
+      </div>
+      {/* Sequencer Grid & VU Meters */}
       <div style={{ display: "flex", overflow: "hidden" }}>
-        {/* Sequencer Grid */}
-        <div style={{ position: "relative", width: STEPS * (cellSize + 4) }}>
+        <div style={{ position: "relative", width: STEPS * (CELL_SIZE + STEP_GAP) }}>
           {grid.map((row, rowIndex) =>
             row.map((isActive, colIndex) => {
               const isCurrent = colIndex === step
@@ -270,11 +362,11 @@ export default function App() {
                   key={`${rowIndex}-${colIndex}`}
                   onClick={() => toggleStep(rowIndex, colIndex)}
                   style={{
-                    width: cellSize,
-                    height: cellSize,
+                    width: CELL_SIZE,
+                    height: CELL_SIZE,
                     position: "absolute",
-                    top: rowIndex * (cellSize + 4),
-                    left: colIndex * (cellSize + 4),
+                    top: rowIndex * (CELL_SIZE + STEP_GAP),
+                    left: colIndex * (CELL_SIZE + STEP_GAP),
                     background: bg,
                     border: "1px solid #000",
                     boxShadow: isCurrent ? `0 0 6px ${themeStyles.highlight}` : "none",
@@ -287,21 +379,39 @@ export default function App() {
         </div>
 
         {/* VU Meters */}
-        <div style={{ marginLeft: 24, display: "flex", flexDirection: "column", gap: 4 }}>
+        <div style={{ marginLeft: 24, display: "flex", flexDirection: "column", gap: STEP_GAP }}>
           {triggeredSteps.map((active, i) => (
             <div
               key={i}
               style={{
                 width: 16,
-                height: cellSize,
+                height: CELL_SIZE,
                 display: "flex",
                 flexDirection: "column",
                 justifyContent: "flex-end",
               }}
             >
-              <div style={{ height: "33%", background: active ? "red" : "#200" }} />
-              <div style={{ height: "33%", background: active ? "yellow" : "#220" }} />
-              <div style={{ height: "34%", background: active ? "lime" : "#040" }} />
+              <div
+                style={{
+                  height: "33%",
+                  background: active ? "red" : "#200",
+                  transition: "all 150ms",
+                }}
+              />
+              <div
+                style={{
+                  height: "33%",
+                  background: active ? "yellow" : "#220",
+                  transition: "all 150ms",
+                }}
+              />
+              <div
+                style={{
+                  height: "34%",
+                  background: active ? "lime" : "#040",
+                  transition: "all 150ms",
+                }}
+              />
             </div>
           ))}
         </div>
