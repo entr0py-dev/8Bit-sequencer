@@ -34,10 +34,11 @@ const initAudio = async () => {
     audioCtxRef.current = new AudioContext()
   }
 
-  // ✅ Ensure the context is allowed to run in Vercel/production
   if (audioCtxRef.current.state === "suspended") {
     await audioCtxRef.current.resume()
   }
+}
+
 
   const ctx = audioCtxRef.current
   for (const sample of samples) {
