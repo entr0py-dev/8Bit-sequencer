@@ -27,17 +27,11 @@ export default function App() {
 
   const getStepTime = () => (60 / bpm) * 1000 / 4
 
-  const handlePlayToggle = async () => {
-  await initAudio()
-
-  // 👇 Force resume the audio context (required in Safari/Chrome)
-  if (audioCtxRef.current?.state === "suspended") {
-    await audioCtxRef.current.resume()
-  }
-
-  setIsPlaying((prev) => !prev)
-}
-
+  const initAudio = async () => {
+    if (!audioCtxRef.current) {
+      const AudioContext = window.AudioContext || window.webkitAudioContext
+      audioCtxRef.current = new AudioContext()
+    }
     const ctx = audioCtxRef.current
     for (const sample of samples) {
       if (!sampleBuffersRef.current[sample] && sample) {
