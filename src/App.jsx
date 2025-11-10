@@ -258,18 +258,27 @@ export default function App() {
 
             <select
               value={sample}
-              onChange={(e) => {
-                const newSamples = [...samples]
-                newSamples[i] = e.target.value
-                setSamples(newSamples)
-                fetch(`/${e.target.value}`)
-                  .then((res) => res.arrayBuffer())
-                  .then((buf) =>
-                    audioCtxRef.current.decodeAudioData(buf).then((decoded) => {
-                      sampleBuffersRef.current[e.target.value] = decoded
-                    })
-                  )
-              }}
+              onChange={async (e) => {
+  const newSamples = [...samples]
+  newSamples[i] = e.target.value
+  setSamples(newSamples)
+
+  // ✅ Fix: Ensure AudioContext exists
+  if (!audioCtxRef.current) {
+    const AudioContext = window.AudioContext || window.webkitAudioContext
+    audioCtxRef.current = new AudioContext()
+  }
+
+  try {
+    const res = await fetch(`/${e.target.value}`)
+    const buf = await res.arrayBuffer()
+    const decoded = await audioCtxRef.current.decodeAudioData(buf)
+    sampleBuffersRef.current[e.target.value] = decoded
+  } catch (err) {
+    console.error("Failed to load sample:", err)
+  }
+}}
+
               style={{
                 width: "100%",
                 padding: 4,
