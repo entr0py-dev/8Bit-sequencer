@@ -2,36 +2,7 @@ import React, { useEffect, useState, useRef, useCallback } from "react"
 
 const TRACKS = 8
 const STEPS = 16
-const CELL = 32
-const GAP = 6
-const STEP_TIME = (bpm) => (60 / bpm) * 1000 / 4
-
-const Cell = React.memo(({ isActive, isCurrent, onClick, row, col }) => {
-  const background = isCurrent
-    ? isActive
-      ? "#ff00ff"
-      : "#333"
-    : isActive
-    ? "#00ffff"
-    : "#111"
-
-  return (
-    <div
-      onClick={onClick}
-      style={{
-        width: CELL,
-        height: CELL,
-        position: "absolute",
-        top: row * (CELL + GAP),
-        left: col * (CELL + GAP),
-        background,
-        border: "2px solid #000",
-        boxShadow: isCurrent ? "0 0 6px 2px #f0f" : "inset 0 0 4px #000",
-        cursor: "pointer",
-      }}
-    />
-  )
-})
+const STEP_GAP = 4
 
 export default function App() {
   const [grid, setGrid] = useState(() =>
@@ -40,32 +11,28 @@ export default function App() {
   const [step, setStep] = useState(0)
   const [isPlaying, setIsPlaying] = useState(false)
   const [bpm, setBpm] = useState(87)
-  const [samples, setSamples] = useState(() =>
-    Array(TRACKS).fill("")
-  )
-  const [volumes, setVolumes] = useState(() =>
-    Array(TRACKS).fill(1)
-  )
-  const [muted, setMuted] = useState(() =>
-    Array(TRACKS).fill(false)
-  )
+  const [samples, setSamples] = useState(Array(TRACKS).fill(""))
+  const [volumes, setVolumes] = useState(Array(TRACKS).fill(1))
+  const [muted, setMuted] = useState(Array(TRACKS).fill(false))
+  const [swing, setSwing] = useState(Array(TRACKS).fill(false))
+  const [pitches, setPitches] = useState(Array(TRACKS).fill(1))
   const [triggeredSteps, setTriggeredSteps] = useState(Array(TRACKS).fill(false))
   const [availableSamples, setAvailableSamples] = useState([])
+  const [theme, setTheme] = useState("synthwave") // or 'crt'
 
   const intervalRef = useRef(null)
   const audioCtxRef = useRef(null)
   const sampleBuffersRef = useRef({})
 
+  const getStepTime = () => (60 / bpm) * 1000 / 4
   useEffect(() => {
     fetch("/samples.json")
       .then((res) => res.json())
       .then((files) => {
         setAvailableSamples(files)
-        setSamples((prev) => prev.map((val, i) => val || files[0] || ""))
+        setSamples((prev) => prev.map((s, i) => s || files[0] || ""))
       })
-      .catch((e) => {
-        console.warn("Could not load samples.json", e)
-      })
+      .catch(console.error)
   }, [])
 
   const initAudio = async () => {
@@ -87,45 +54,52 @@ export default function App() {
     }
   }
 
-  const playSample = (sample, volume = 1) => {
+  const playSample = (sample, volume = 1, pitch = 1) => {
     const ctx = audioCtxRef.current
     const buffer = sampleBuffersRef.current[sample]
     if (!ctx || !buffer) return
 
     const source = ctx.createBufferSource()
-    source.buffer = buffer
-
     const gainNode = ctx.createGain()
+    source.buffer = buffer
+    source.playbackRate.value = pitch
     gainNode.gain.value = volume
 
     source.connect(gainNode).connect(ctx.destination)
     source.start()
   }
 
-  const toggleStep = useCallback((row, col) => {
+  const toggleStep = (row, col) => {
     setGrid((prev) => {
       const copy = prev.map((r) => [...r])
       copy[row][col] = !copy[row][col]
       return copy
     })
-  }, [])
+  }
 
-  const playStep = (current) => {
+  const playStep = (currentStep) => {
+    const stepTime = getStepTime()
     const newTriggers = Array(TRACKS).fill(false)
 
     grid.forEach((row, trackIndex) => {
-      if (row[current] && !muted[trackIndex]) {
+      const isActive = row[currentStep]
+      if (isActive && !muted[trackIndex]) {
         const file = samples[trackIndex]
-        if (file && sampleBuffersRef.current[file]) {
-          playSample(file, volumes[trackIndex])
-          newTriggers[trackIndex] = true
-        }
+        const pitch = pitches[trackIndex]
+        const volume = volumes[trackIndex]
+        const shouldSwing = swing[trackIndex]
+        const delay = shouldSwing && currentStep % 2 === 1 ? stepTime * 0.2 : 0
+
+        setTimeout(() => {
+          playSample(file, volume, pitch)
+        }, delay)
+
+        newTriggers[trackIndex] = true
       }
     })
 
     setTriggeredSteps(newTriggers)
   }
-
   useEffect(() => {
     if (!isPlaying) {
       clearInterval(intervalRef.current)
@@ -138,75 +112,58 @@ export default function App() {
         playStep(next)
         return next
       })
-    }, STEP_TIME(bpm))
+    }, getStepTime())
 
     return () => clearInterval(intervalRef.current)
-  }, [isPlaying, bpm, grid, volumes, muted, samples])
+  }, [isPlaying, bpm, grid, samples, volumes, muted, pitches, swing])
 
-  const handleStart = async () => {
+  const handlePlayToggle = async () => {
     await initAudio()
     setIsPlaying((prev) => !prev)
   }
 
-  const updateSample = (index, value) => {
-    const updated = [...samples]
-    updated[index] = value
-    setSamples(updated)
-
-    // Preload new sample buffer
-    fetch(`/${value}`)
-      .then((res) => res.arrayBuffer())
-      .then((buf) => audioCtxRef.current.decodeAudioData(buf))
-      .then((decoded) => {
-        sampleBuffersRef.current[value] = decoded
-      })
+  const colors = {
+    synthwave: {
+      bg: "#111",
+      text: "#0ff",
+      highlight: "#f0f",
+    },
+    crt: {
+      bg: "#000",
+      text: "#0f0",
+      highlight: "#0c0",
+    },
   }
 
-  const updateVolume = (index, value) => {
-    setVolumes((prev) => {
-      const copy = [...prev]
-      copy[index] = parseFloat(value)
-      return copy
-    })
-  }
+  const themeStyles = colors[theme]
 
-  const toggleMute = (index) => {
-    setMuted((prev) => {
-      const copy = [...prev]
-      copy[index] = !copy[index]
-      return copy
-    })
-  }
+  const cellSize = Math.floor((window.innerWidth - 240) / STEPS)
 
   return (
     <div
       style={{
-        background: "linear-gradient(145deg, #080808, #1a1a1a)",
-        color: "#0ff",
-        minHeight: "100vh",
-        padding: 20,
+        background: themeStyles.bg,
+        color: themeStyles.text,
         fontFamily: "'Press Start 2P', monospace",
-        overflowX: "auto",
+        padding: 20,
+        minHeight: "100vh",
       }}
     >
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
-      `}</style>
+      <style>
+        {`@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');`}
+      </style>
 
-      {/* Top controls */}
       <div style={{ marginBottom: 24, display: "flex", alignItems: "center", gap: 16 }}>
         <button
-          onClick={handleStart}
+          onClick={handlePlayToggle}
           style={{
-            background: isPlaying ? "#ff0033" : "#00ff00",
-            color: "#000",
+            background: themeStyles.highlight,
+            color: themeStyles.bg,
             fontWeight: "bold",
             fontSize: 14,
             padding: "10px 20px",
-            border: "3px solid #0ff",
-            boxShadow: "0 0 10px #0ff",
+            border: "2px solid " + themeStyles.text,
             cursor: "pointer",
-            fontFamily: "inherit",
           }}
         >
           {isPlaying ? "STOP" : "PLAY"}
@@ -216,47 +173,57 @@ export default function App() {
         <input
           type="number"
           value={bpm}
-          min={60}
-          max={180}
           onChange={(e) => setBpm(Number(e.target.value))}
           style={{
             width: 60,
-            padding: "6px 10px",
-            background: "#111",
-            border: "2px solid #0ff",
-            color: "#0ff",
-            fontFamily: "inherit",
+            padding: "4px 8px",
+            background: "#000",
+            border: "1px solid " + themeStyles.text,
+            color: themeStyles.text,
           }}
         />
+
+        <button
+          onClick={() =>
+            setTheme((prev) => (prev === "synthwave" ? "crt" : "synthwave"))
+          }
+          style={{
+            padding: "6px 12px",
+            border: "2px solid " + themeStyles.text,
+            background: "transparent",
+            color: themeStyles.text,
+            marginLeft: "auto",
+          }}
+        >
+          Theme: {theme.toUpperCase()}
+        </button>
       </div>
 
-      {/* Track controls */}
       <div style={{ display: "flex", flexWrap: "wrap", gap: 16, marginBottom: 32 }}>
         {samples.map((sample, i) => (
-          <div key={i} style={{ width: 180, position: "relative" }}>
-            <div style={{ marginBottom: 6, fontSize: 10 }}>Track {i + 1}</div>
-
-            <div
-              style={{
-                fontSize: 10,
-                color: muted[i] ? "#888" : "#0ff",
-                marginBottom: 4,
-              }}
-            >
-              {sample.replace(/\.(mp3|wav)/, "").toUpperCase()}
-            </div>
+          <div key={i} style={{ width: 220 }}>
+            <div style={{ fontSize: 10, marginBottom: 4 }}>Track {i + 1}</div>
 
             <select
-              defaultValue={sample}
-              onChange={(e) => updateSample(i, e.target.value)}
+              value={sample}
+              onChange={(e) => {
+                const newSamples = [...samples]
+                newSamples[i] = e.target.value
+                setSamples(newSamples)
+                fetch(`/${e.target.value}`)
+                  .then((res) => res.arrayBuffer())
+                  .then((buf) =>
+                    audioCtxRef.current.decodeAudioData(buf).then((decoded) => {
+                      sampleBuffersRef.current[e.target.value] = decoded
+                    })
+                  )
+              }}
               style={{
                 width: "100%",
-                padding: "6px 8px",
+                padding: 4,
                 background: "#111",
-                border: "2px solid #0ff",
-                color: "#0ff",
+                color: themeStyles.text,
                 fontFamily: "inherit",
-                fontSize: 10,
               }}
             >
               {availableSamples.map((file) => (
@@ -266,30 +233,65 @@ export default function App() {
               ))}
             </select>
 
+            <div style={{ fontSize: 10, marginTop: 6 }}>Volume</div>
             <input
               type="range"
               min="0"
               max="1"
               step="0.01"
               value={volumes[i]}
-              onChange={(e) => updateVolume(i, e.target.value)}
-              style={{
-                width: "100%",
-                marginTop: 4,
-                accentColor: "#0ff",
+              onChange={(e) => {
+                const newVolumes = [...volumes]
+                newVolumes[i] = parseFloat(e.target.value)
+                setVolumes(newVolumes)
               }}
+              style={{ width: "100%" }}
             />
 
+            <div style={{ fontSize: 10, marginTop: 6 }}>Pitch</div>
+            <input
+              type="range"
+              min="0.5"
+              max="2"
+              step="0.01"
+              value={pitches[i]}
+              onChange={(e) => {
+                const newPitches = [...pitches]
+                newPitches[i] = parseFloat(e.target.value)
+                setPitches(newPitches)
+              }}
+              style={{ width: "100%" }}
+            />
+
+            <div style={{ marginTop: 6 }}>
+              <label style={{ fontSize: 10 }}>
+                <input
+                  type="checkbox"
+                  checked={swing[i]}
+                  onChange={() => {
+                    const newSwing = [...swing]
+                    newSwing[i] = !newSwing[i]
+                    setSwing(newSwing)
+                  }}
+                  style={{ marginRight: 4 }}
+                />
+                Swing
+              </label>
+            </div>
+
             <button
-              onClick={() => toggleMute(i)}
+              onClick={() => {
+                const newMuted = [...muted]
+                newMuted[i] = !newMuted[i]
+                setMuted(newMuted)
+              }}
               style={{
                 marginTop: 4,
-                fontSize: 10,
-                background: muted[i] ? "#444" : "#0ff",
-                color: muted[i] ? "#ccc" : "#000",
-                border: "2px solid #000",
-                cursor: "pointer",
                 width: "100%",
+                background: muted[i] ? "#444" : themeStyles.highlight,
+                color: muted[i] ? "#aaa" : themeStyles.bg,
+                border: "2px solid #000",
+                fontSize: 10,
               }}
             >
               {muted[i] ? "MUTED" : "MUTE"}
@@ -298,32 +300,48 @@ export default function App() {
         ))}
       </div>
 
-      {/* Sequencer + VU */}
-      <div style={{ display: "flex", alignItems: "flex-start", position: "relative" }}>
-        {/* Sequencer grid */}
-        <div style={{ position: "relative", width: STEPS * (CELL + GAP) }}>
+      <div style={{ display: "flex", alignItems: "flex-start" }}>
+        {/* Sequencer Grid */}
+        <div style={{ position: "relative", width: STEPS * (cellSize + STEP_GAP) }}>
           {grid.map((row, rowIndex) =>
-            row.map((isActive, colIndex) => (
-              <Cell
-                key={`${rowIndex}-${colIndex}`}
-                isActive={isActive}
-                isCurrent={step === colIndex}
-                row={rowIndex}
-                col={colIndex}
-                onClick={() => toggleStep(rowIndex, colIndex)}
-              />
-            ))
+            row.map((isActive, colIndex) => {
+              const isCurrent = colIndex === step
+              const bg = isCurrent
+                ? isActive
+                  ? themeStyles.highlight
+                  : "#333"
+                : isActive
+                ? themeStyles.text
+                : "#111"
+              return (
+                <div
+                  key={`${rowIndex}-${colIndex}`}
+                  onClick={() => toggleStep(rowIndex, colIndex)}
+                  style={{
+                    width: cellSize,
+                    height: cellSize,
+                    position: "absolute",
+                    top: rowIndex * (cellSize + STEP_GAP),
+                    left: colIndex * (cellSize + STEP_GAP),
+                    background: bg,
+                    border: "1px solid #000",
+                    boxShadow: isCurrent ? `0 0 8px ${themeStyles.highlight}` : "none",
+                    cursor: "pointer",
+                  }}
+                />
+              )
+            })
           )}
         </div>
 
-        {/* VU meters */}
-        <div style={{ marginLeft: 48, display: "flex", flexDirection: "column", gap: GAP }}>
+        {/* VU Meters */}
+        <div style={{ marginLeft: 32, display: "flex", flexDirection: "column", gap: STEP_GAP }}>
           {triggeredSteps.map((active, i) => (
             <div
               key={i}
               style={{
-                width: 24,
-                height: CELL,
+                width: 16,
+                height: cellSize,
                 display: "flex",
                 flexDirection: "column",
                 justifyContent: "flex-end",
@@ -333,21 +351,21 @@ export default function App() {
                 style={{
                   height: "33%",
                   background: active ? "red" : "#200",
-                  transition: "all 150ms ease",
+                  transition: "all 150ms",
                 }}
               />
               <div
                 style={{
                   height: "33%",
                   background: active ? "yellow" : "#220",
-                  transition: "all 150ms ease",
+                  transition: "all 150ms",
                 }}
               />
               <div
                 style={{
                   height: "34%",
                   background: active ? "lime" : "#040",
-                  transition: "all 150ms ease",
+                  transition: "all 150ms",
                 }}
               />
             </div>
