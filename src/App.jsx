@@ -21,7 +21,8 @@ export default function App() {
   const [availableSamples, setAvailableSamples] = useState([])
   const [theme, setTheme] = useState("synthwave")
   const [showSaveToast, setShowSaveToast] = useState(false)
-  
+  const [userSamples, setUserSamples] = useState({})
+ 
   const intervalRef = useRef(null)
   const audioCtxRef = useRef(null)
   const sampleBuffersRef = useRef({})
@@ -260,6 +261,39 @@ const savePattern = () => {
         >
           Load
         </button>
+        <input
+  type="file"
+  accept=".wav,.mp3"
+  onChange={(e) => {
+    const file = e.target.files[0]
+    if (!file) return
+
+    const reader = new FileReader()
+    reader.onload = async () => {
+      try {
+        if (!audioCtxRef.current) {
+          const AudioContext = window.AudioContext || window.webkitAudioContext
+          audioCtxRef.current = new AudioContext()
+        }
+        const arrayBuffer = reader.result
+        const audioBuffer = await audioCtxRef.current.decodeAudioData(arrayBuffer)
+        sampleBuffersRef.current[file.name] = audioBuffer
+        setUserSamples((prev) => ({ ...prev, [file.name]: audioBuffer }))
+      } catch (err) {
+        console.error("Upload decode failed:", err)
+      }
+    }
+    reader.readAsArrayBuffer(file)
+  }}
+  style={{
+    padding: 6,
+    fontSize: 10,
+    color: themeStyles.text,
+    background: themeStyles.bg,
+    border: "1px solid " + themeStyles.text,
+    marginLeft: 8,
+  }}
+          />
 
         <button
           onClick={() => setTheme((prev) => (prev === "synthwave" ? "crt" : "synthwave"))}
@@ -293,12 +327,16 @@ const savePattern = () => {
     audioCtxRef.current = new AudioContext()
   }
 
-  try {
-    const res = await fetch(`/${e.target.value}`)
-    const buf = await res.arrayBuffer()
-    const decoded = await audioCtxRef.current.decodeAudioData(buf)
-    sampleBuffersRef.current[e.target.value] = decoded
-  } catch (err) {
+ if (!sampleBuffersRef.current[e.target.value] && e.target.value) {
+  // Skip fetch if it's a user-uploaded sample
+  if (userSamples[e.target.value]) return
+
+  const res = await fetch(`/${e.target.value}`)
+  const buf = await res.arrayBuffer()
+  const decoded = await audioCtxRef.current.decodeAudioData(buf)
+  sampleBuffersRef.current[e.target.value] = decoded
+}
+ catch (err) {
     console.error("Failed to load sample:", err)
   }
 }}
@@ -311,7 +349,8 @@ const savePattern = () => {
                 fontFamily: "inherit",
               }}
             >
-              {availableSamples.map((file) => (
+              {[...availableSamples, ...Object.keys(userSamples)].map((file) => (
+
                 <option key={file} value={file}>
                   {file.replace(/\.(mp3|wav)/, "").toUpperCase()}
                 </option>
@@ -473,6 +512,35 @@ const savePattern = () => {
     Pattern Saved!
   </div>
 )}
+<div style={{
+  position: "absolute",
+  bottom: 20,
+  right: 20,
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "flex-end",
+  fontSize: 8,
+  color: themeStyles.text,
+  opacity: 0.8,
+}}>
+  <div style={{ display: "flex", gap: 6 }}>
+    {[...Array(4)].map((_, i) => (
+      <div
+        key={i}
+        style={{
+          width: 10,
+          height: 10,
+          borderRadius: "50%",
+          background: Math.random() > 0.5 ? themeStyles.highlight : "#222",
+          boxShadow: "0 0 4px " + themeStyles.highlight,
+          transition: "opacity 0.3s",
+        }}
+      />
+    ))}
+  </div>
+  <div style={{ marginTop: 6 }}>SYS DIAG OK</div>
+  <div>MODEL: DX8-TRK</div>
+</div>
 
     </div>
   )
