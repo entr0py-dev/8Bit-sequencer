@@ -1,6 +1,5 @@
 import React, { useEffect, useState, useRef } from "react"
 
-const [showSaveToast, setShowSaveToast] = useState(false)
 const TRACKS = 8
 const STEPS = 16
 const STEP_GAP = 4
@@ -21,7 +20,8 @@ export default function App() {
   const [triggeredSteps, setTriggeredSteps] = useState(Array(TRACKS).fill(false))
   const [availableSamples, setAvailableSamples] = useState([])
   const [theme, setTheme] = useState("synthwave")
-
+  const [showSaveToast, setShowSaveToast] = useState(false)
+  
   const intervalRef = useRef(null)
   const audioCtxRef = useRef(null)
   const sampleBuffersRef = useRef({})
