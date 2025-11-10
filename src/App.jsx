@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from "react"
 
+const [showSaveToast, setShowSaveToast] = useState(false)
 const TRACKS = 8
 const STEPS = 16
 const STEP_GAP = 4
@@ -119,18 +120,21 @@ export default function App() {
 }
 
 
-  const savePattern = () => {
-    const pattern = {
-      grid,
-      bpm,
-      samples,
-      volumes,
-      muted,
-      swing,
-      pitches,
-    }
-    localStorage.setItem("sequencerPattern", JSON.stringify(pattern))
+const savePattern = () => {
+  const pattern = {
+    grid,
+    bpm,
+    samples,
+    volumes,
+    muted,
+    swing,
+    pitches,
   }
+  localStorage.setItem("sequencerPattern", JSON.stringify(pattern))
+  setShowSaveToast(true)
+  setTimeout(() => setShowSaveToast(false), 2000)
+}
+
 
   const loadPattern = () => {
     const pattern = JSON.parse(localStorage.getItem("sequencerPattern"))
@@ -432,6 +436,24 @@ export default function App() {
           ))}
         </div>
       </div>
+      {showSaveToast && (
+  <div
+    style={{
+      position: "absolute",
+      top: 20,
+      right: 20,
+      background: themeStyles.highlight,
+      color: themeStyles.bg,
+      padding: "8px 16px",
+      fontSize: 10,
+      border: `2px solid ${themeStyles.text}`,
+      zIndex: 999,
+    }}
+  >
+    Pattern Saved!
+  </div>
+)}
+
     </div>
   )
 }
