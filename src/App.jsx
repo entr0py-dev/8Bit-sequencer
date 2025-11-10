@@ -75,8 +75,9 @@ export default function App() {
       })
   }, [])
 
+  // Sync refs on samples
   useEffect(() => {
-    audioRefs.current = samples.map(() => React.createRef())
+    audioRefs.current = samples.map((_, i) => React.createRef())
   }, [samples])
 
   const toggleStep = useCallback((row, col) => {
@@ -170,17 +171,19 @@ export default function App() {
         @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
       `}</style>
 
+      {/* Audio elements */}
       {samples.map((src, i) =>
         src ? (
           <audio
             key={`${i}-${src}`}
             ref={audioRefs.current[i]}
             src={`/${src}`}
-            preload="none"
+            preload="auto"
           />
         ) : null
       )}
 
+      {/* Top controls */}
       <div style={{ marginBottom: 24, display: "flex", alignItems: "center", gap: 16 }}>
         <button
           onClick={() => setIsPlaying(!isPlaying)}
@@ -217,9 +220,10 @@ export default function App() {
         />
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, marginBottom: 32 }}>
+      {/* Track controls */}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 16, marginBottom: 32 }}>
         {samples.map((sample, i) => (
-          <div key={i} style={{ position: "relative" }}>
+          <div key={i} style={{ width: 180, position: "relative" }}>
             <div style={{ marginBottom: 6, fontSize: 10 }}>Track {i + 1}</div>
 
             <div
@@ -284,7 +288,9 @@ export default function App() {
         ))}
       </div>
 
-      <div style={{ position: "relative", display: "flex" }}>
+      {/* Sequencer + VU */}
+      <div style={{ display: "flex", alignItems: "flex-start", position: "relative" }}>
+        {/* Sequencer grid */}
         <div style={{ position: "relative", width: STEPS * (CELL + GAP) }}>
           {grid.map((row, rowIndex) =>
             row.map((isActive, colIndex) => (
@@ -300,32 +306,38 @@ export default function App() {
           )}
         </div>
 
-        {/* VU meters */}
-        <div style={{ marginLeft: 16, display: "flex", flexDirection: "column", justifyContent: "center", gap: GAP }}>
+        {/* VU meters — positioned to the right */}
+        <div style={{ marginLeft: 48, display: "flex", flexDirection: "column", gap: GAP }}>
           {triggeredSteps.map((active, i) => (
-            <div key={i} style={{ display: "flex", flexDirection: "column", height: CELL, justifyContent: "space-between" }}>
+            <div
+              key={i}
+              style={{
+                width: 24,
+                height: CELL,
+                display: "flex",
+                flexDirection: "column",
+                justifyContent: "flex-end",
+              }}
+            >
               <div
                 style={{
-                  width: 8,
-                  height: 6,
+                  height: "33%",
                   background: active ? "red" : "#200",
-                  transition: "all 120ms ease",
+                  transition: "all 150ms ease",
                 }}
               />
               <div
                 style={{
-                  width: 8,
-                  height: 6,
+                  height: "33%",
                   background: active ? "yellow" : "#220",
-                  transition: "all 120ms ease",
+                  transition: "all 150ms ease",
                 }}
               />
               <div
                 style={{
-                  width: 8,
-                  height: 6,
+                  height: "34%",
                   background: active ? "lime" : "#040",
-                  transition: "all 120ms ease",
+                  transition: "all 150ms ease",
                 }}
               />
             </div>
