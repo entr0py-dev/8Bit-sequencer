@@ -1,10 +1,48 @@
-import React, { useEffect, useRef, useState } from "react"
+import React, { useEffect, useRef, useState, useCallback } from "react"
 
 const TRACKS = 8
 const STEPS = 16
 const CELL = 32
 const GAP = 6
 const STEP_TIME = (bpm) => (60 / bpm) * 1000 / 4
+
+const debounce = (fn, delay) => {
+  let timer
+  return (...args) => {
+    clearTimeout(timer)
+    timer = setTimeout(() => fn(...args), delay)
+  }
+}
+
+// === Memoized Cell ===
+const Cell = React.memo(({ isActive, isCurrent, onClick, row, col }) => {
+  const background = isCurrent
+    ? isActive
+      ? "#ff00ff"
+      : "#333"
+    : isActive
+    ? "#00ffff"
+    : "#111"
+
+  return (
+    <div
+      onClick={onClick}
+      style={{
+        width: CELL,
+        height: CELL,
+        position: "absolute",
+        top: row * (CELL + GAP),
+        left: col * (CELL + GAP),
+        background,
+        border: "2px solid #000",
+        boxShadow: isCurrent
+          ? "0 0 6px 2px #f0f"
+          : "inset 0 0 4px #000",
+        cursor: "pointer",
+      }}
+    />
+  )
+})
 
 export default function App() {
   const [grid, setGrid] = useState(() =>
@@ -24,19 +62,18 @@ export default function App() {
   const intervalRef = useRef(null)
   const audioRefs = useRef([])
 
-  // Load available samples from public/samples.json
-useEffect(() => {
-  fetch("/samples.json")
-    .then(res => res.json())
-    .then(files => {
-      setAvailableSamples(files)
-      setSamples(prev => prev.map((val) => val || files[0] || ""))
-    })
-    .catch(e => console.warn("Could not load samples.json", e))
-}, [])
+  useEffect(() => {
+    fetch("/samples.json")
+      .then((res) => res.json())
+      .then((files) => {
+        setAvailableSamples(files)
+        setSamples((prev) => prev.map((val, i) => val || files[0] || ""))
+      })
+      .catch((e) => {
+        console.warn("Could not load samples.json", e)
+      })
+  }, [])
 
-
-  // Maintain audio refs
   useEffect(() => {
     audioRefs.current = audioRefs.current.slice(0, samples.length)
     while (audioRefs.current.length < samples.length) {
@@ -44,11 +81,13 @@ useEffect(() => {
     }
   }, [samples])
 
-  const toggleStep = (row, col) => {
-    const copy = grid.map((r) => [...r])
-    copy[row][col] = !copy[row][col]
-    setGrid(copy)
-  }
+  const toggleStep = useCallback((row, col) => {
+    setGrid((prev) => {
+      const copy = prev.map((r) => [...r])
+      copy[row][col] = !copy[row][col]
+      return copy
+    })
+  }, [])
 
   const playStep = (current) => {
     grid.forEach((row, trackIndex) => {
@@ -84,7 +123,7 @@ useEffect(() => {
     return () => clearInterval(intervalRef.current)
   }, [isPlaying, bpm, grid, volumes])
 
-  const handleSampleChange = (index, value) => {
+  const updateSample = (index, value) => {
     const updated = [...samples]
     updated[index] = value
     setSamples(updated)
@@ -94,11 +133,17 @@ useEffect(() => {
     }, 100)
   }
 
-  const handleVolumeChange = (index, value) => {
-    const updated = [...volumes]
-    updated[index] = parseFloat(value)
-    setVolumes(updated)
-  }
+  const debouncedUpdateSample = useCallback(debounce(updateSample, 100), [])
+  const debouncedSetVolume = useCallback(
+    debounce((index, value) => {
+      setVolumes((prev) => {
+        const copy = [...prev]
+        copy[index] = parseFloat(value)
+        return copy
+      })
+    }, 100),
+    []
+  )
 
   return (
     <div
@@ -120,12 +165,11 @@ useEffect(() => {
             key={i}
             ref={audioRefs.current[i]}
             src={`/${src}`}
-            preload="auto"
+            preload="none"
           />
         ) : null
       )}
 
-      {/* Controls */}
       <div style={{ marginBottom: 24, display: "flex", alignItems: "center", gap: 16 }}>
         <button
           onClick={() => setIsPlaying(!isPlaying)}
@@ -162,14 +206,13 @@ useEffect(() => {
         />
       </div>
 
-      {/* Track Controls */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, marginBottom: 32 }}>
         {samples.map((sample, i) => (
           <div key={i}>
             <div style={{ marginBottom: 6, fontSize: 10 }}>Track {i + 1}</div>
             <select
-              value={sample}
-              onChange={(e) => handleSampleChange(i, e.target.value)}
+              defaultValue={sample}
+              onChange={(e) => debouncedUpdateSample(i, e.target.value)}
               style={{
                 width: "100%",
                 padding: "6px 8px",
@@ -191,8 +234,8 @@ useEffect(() => {
               min="0"
               max="1"
               step="0.01"
-              value={volumes[i]}
-              onChange={(e) => handleVolumeChange(i, e.target.value)}
+              defaultValue={volumes[i]}
+              onChange={(e) => debouncedSetVolume(i, e.target.value)}
               style={{
                 width: "100%",
                 marginTop: 4,
@@ -203,39 +246,18 @@ useEffect(() => {
         ))}
       </div>
 
-      {/* Sequencer Grid */}
       <div style={{ position: "relative" }}>
         {grid.map((row, rowIndex) =>
-          row.map((isActive, colIndex) => {
-            const isCurrent = step === colIndex
-            const background = isCurrent
-              ? isActive
-                ? "#ff00ff"
-                : "#333"
-              : isActive
-              ? "#00ffff"
-              : "#111"
-
-            return (
-              <div
-                key={`${rowIndex}-${colIndex}`}
-                onClick={() => toggleStep(rowIndex, colIndex)}
-                style={{
-                  width: CELL,
-                  height: CELL,
-                  position: "absolute",
-                  top: rowIndex * (CELL + GAP),
-                  left: colIndex * (CELL + GAP),
-                  background,
-                  border: "2px solid #000",
-                  boxShadow: isCurrent
-                    ? "0 0 6px 2px #f0f"
-                    : "inset 0 0 4px #000",
-                  cursor: "pointer",
-                }}
-              />
-            )
-          })
+          row.map((isActive, colIndex) => (
+            <Cell
+              key={`${rowIndex}-${colIndex}`}
+              isActive={isActive}
+              isCurrent={step === colIndex}
+              row={rowIndex}
+              col={colIndex}
+              onClick={() => toggleStep(rowIndex, colIndex)}
+            />
+          ))
         )}
       </div>
     </div>
