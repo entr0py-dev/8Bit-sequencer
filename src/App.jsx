@@ -69,33 +69,45 @@ const initAudio = async () => {
     source.start()
   }
 
-  const playStep = (currentStep) => {
-    const stepTime = getStepTime()
-    const newTriggers = Array(TRACKS).fill(false)
-    grid.forEach((row, trackIndex) => {
-      const isActive = row[currentStep]
-      if (isActive && !muted[trackIndex]) {
-        const file = samples[trackIndex]
-        const pitch = pitches[trackIndex]
-        const volume = volumes[trackIndex]
-        const shouldSwing = swing[trackIndex]
-        const delay = shouldSwing && currentStep % 2 === 1 ? stepTime * 0.2 : 0
-        setTimeout(() => {
-          playSample(file, volume, pitch)
-        }, delay)
-        newTriggers[trackIndex] = true
+  const playStep = async (currentStep) => {
+  const stepTime = getStepTime()
+  const newTriggers = Array(TRACKS).fill(false)
+
+  for (let trackIndex = 0; trackIndex < TRACKS; trackIndex++) {
+    const row = grid[trackIndex]
+    const isActive = row[currentStep]
+
+    if (isActive && !muted[trackIndex]) {
+      const file = samples[trackIndex]
+      const pitch = pitches[trackIndex]
+      const volume = volumes[trackIndex]
+      const shouldSwing = swing[trackIndex]
+
+      // ✅ SAFARI FIX: decode on demand after user interaction
+      if (!sampleBuffersRef.current[file] && file) {
+        try {
+          const res = await fetch(`/${file}`)
+          const arrayBuffer = await res.arrayBuffer()
+          const audioBuffer = await audioCtxRef.current.decodeAudioData(arrayBuffer)
+          sampleBuffersRef.current[file] = audioBuffer
+        } catch (e) {
+          console.error(`Failed to decode ${file}:`, e)
+          continue // skip this sample
+        }
       }
-    })
-    setTriggeredSteps(newTriggers)
+
+      const delay = shouldSwing && currentStep % 2 === 1 ? stepTime * 0.2 : 0
+      setTimeout(() => {
+        playSample(file, volume, pitch)
+      }, delay)
+
+      newTriggers[trackIndex] = true
+    }
   }
 
-  const toggleStep = (row, col) => {
-    setGrid((prev) => {
-      const copy = prev.map((r) => [...r])
-      copy[row][col] = !copy[row][col]
-      return copy
-    })
-  }
+  setTriggeredSteps(newTriggers)
+}
+
 
   useEffect(() => {
     fetch("/samples.json")
