@@ -6,14 +6,6 @@ const CELL = 32
 const GAP = 6
 const STEP_TIME = (bpm) => (60 / bpm) * 1000 / 4
 
-const debounce = (fn, delay) => {
-  let timer
-  return (...args) => {
-    clearTimeout(timer)
-    timer = setTimeout(() => fn(...args), delay)
-  }
-}
-
 const Cell = React.memo(({ isActive, isCurrent, onClick, row, col }) => {
   const background = isCurrent
     ? isActive
@@ -61,6 +53,8 @@ export default function App() {
   const [availableSamples, setAvailableSamples] = useState([])
 
   const intervalRef = useRef(null)
+  const audioCtxRef = useRef(null)
+  const sampleBuffersRef = useRef({})
 
   useEffect(() => {
     fetch("/samples.json")
@@ -73,6 +67,40 @@ export default function App() {
         console.warn("Could not load samples.json", e)
       })
   }, [])
+
+  const initAudio = async () => {
+    if (!audioCtxRef.current) {
+      const AudioContext = window.AudioContext || window.webkitAudioContext
+      audioCtxRef.current = new AudioContext()
+    }
+
+    const ctx = audioCtxRef.current
+    const buffers = sampleBuffersRef.current
+
+    for (const sample of samples) {
+      if (!buffers[sample]) {
+        const res = await fetch(`/${sample}`)
+        const arrayBuffer = await res.arrayBuffer()
+        const audioBuffer = await ctx.decodeAudioData(arrayBuffer)
+        buffers[sample] = audioBuffer
+      }
+    }
+  }
+
+  const playSample = (sample, volume = 1) => {
+    const ctx = audioCtxRef.current
+    const buffer = sampleBuffersRef.current[sample]
+    if (!ctx || !buffer) return
+
+    const source = ctx.createBufferSource()
+    source.buffer = buffer
+
+    const gainNode = ctx.createGain()
+    gainNode.gain.value = volume
+
+    source.connect(gainNode).connect(ctx.destination)
+    source.start()
+  }
 
   const toggleStep = useCallback((row, col) => {
     setGrid((prev) => {
@@ -88,10 +116,8 @@ export default function App() {
     grid.forEach((row, trackIndex) => {
       if (row[current] && !muted[trackIndex]) {
         const file = samples[trackIndex]
-        if (file) {
-          const audio = new Audio(`/${file}`)
-          audio.volume = volumes[trackIndex]
-          audio.play().catch(() => {})
+        if (file && sampleBuffersRef.current[file]) {
+          playSample(file, volumes[trackIndex])
           newTriggers[trackIndex] = true
         }
       }
@@ -117,23 +143,32 @@ export default function App() {
     return () => clearInterval(intervalRef.current)
   }, [isPlaying, bpm, grid, volumes, muted, samples])
 
+  const handleStart = async () => {
+    await initAudio()
+    setIsPlaying((prev) => !prev)
+  }
+
   const updateSample = (index, value) => {
     const updated = [...samples]
     updated[index] = value
     setSamples(updated)
+
+    // Preload new sample buffer
+    fetch(`/${value}`)
+      .then((res) => res.arrayBuffer())
+      .then((buf) => audioCtxRef.current.decodeAudioData(buf))
+      .then((decoded) => {
+        sampleBuffersRef.current[value] = decoded
+      })
   }
 
-  const debouncedUpdateSample = useCallback(debounce(updateSample, 100), [])
-  const debouncedSetVolume = useCallback(
-    debounce((index, value) => {
-      setVolumes((prev) => {
-        const copy = [...prev]
-        copy[index] = parseFloat(value)
-        return copy
-      })
-    }, 100),
-    []
-  )
+  const updateVolume = (index, value) => {
+    setVolumes((prev) => {
+      const copy = [...prev]
+      copy[index] = parseFloat(value)
+      return copy
+    })
+  }
 
   const toggleMute = (index) => {
     setMuted((prev) => {
@@ -161,7 +196,7 @@ export default function App() {
       {/* Top controls */}
       <div style={{ marginBottom: 24, display: "flex", alignItems: "center", gap: 16 }}>
         <button
-          onClick={() => setIsPlaying(!isPlaying)}
+          onClick={handleStart}
           style={{
             background: isPlaying ? "#ff0033" : "#00ff00",
             color: "#000",
@@ -213,7 +248,7 @@ export default function App() {
 
             <select
               defaultValue={sample}
-              onChange={(e) => debouncedUpdateSample(i, e.target.value)}
+              onChange={(e) => updateSample(i, e.target.value)}
               style={{
                 width: "100%",
                 padding: "6px 8px",
@@ -236,8 +271,8 @@ export default function App() {
               min="0"
               max="1"
               step="0.01"
-              defaultValue={volumes[i]}
-              onChange={(e) => debouncedSetVolume(i, e.target.value)}
+              value={volumes[i]}
+              onChange={(e) => updateVolume(i, e.target.value)}
               style={{
                 width: "100%",
                 marginTop: 4,
