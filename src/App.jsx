@@ -126,28 +126,18 @@ const initAudio = async () => {
       })
   }, [])
  useEffect(() => {
-  if (!isPlaying) return
-
-  const ctx = audioCtxRef.current
-  if (!ctx) return
-
-  let lastStepTime = ctx.currentTime
-
-  const tick = () => {
-    const now = ctx.currentTime
-    const interval = (60 / bpm) / 4  // quarter step in seconds
-    if (now - lastStepTime >= interval) {
-      lastStepTime += interval
-      setStep((prev) => {
-        const next = (prev + 1) % STEPS
-        playStep(next)
-        return next
-      })
-    }
-    requestAnimationFrame(tick)
+  if (!isPlaying) {
+    clearInterval(intervalRef.current)
+    return
   }
-
-  requestAnimationFrame(tick)
+  intervalRef.current = setInterval(() => {
+    setStep((prev) => {
+      const next = (prev + 1) % STEPS
+      playStep(next)
+      return next
+    })
+  }, getStepTime())
+  return () => clearInterval(intervalRef.current)
 }, [isPlaying, bpm, grid, samples, volumes, muted, pitches, swing])
 
 
@@ -546,7 +536,10 @@ sampleBuffersRef.current[e.target.value] = decoded
     Pattern Saved!
   </div>
 )}
-Entropy Records Sequencer V1
+<div style={{fontSize:10, marginTop:10}}>
+  Entropy Records Sequencer V1
+</div>
+
 {/* ✅ Proper JSX comment, not a block comment */}
 <div
   style={{
