@@ -128,6 +128,7 @@ const initAudio = async () => {
       })
   }, [])
   useEffect(() => {
+    if (!unlocked) return
   const preload = async () => {
     if (!audioCtxRef.current) return
     for (const file of availableSamples) {
