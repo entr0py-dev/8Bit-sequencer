@@ -126,13 +126,7 @@ const initAudio = async () => {
         setSamples((prev) => prev.map((s, i) => s || files[0] || ""))
       })
   }, [])
- useEffect(() => {
-  // don't run clock until actually playing AND samples loaded
-  if (!isPlaying) {
-    clearInterval(intervalRef.current)
-    return
-  }
-useEffect(() => {
+  useEffect(() => {
   const preload = async () => {
     if (!audioCtxRef.current) return
     for (const file of availableSamples) {
@@ -146,6 +140,13 @@ useEffect(() => {
   }
   preload()
 }, [availableSamples])
+ useEffect(() => {
+  // don't run clock until actually playing AND samples loaded
+  if (!isPlaying) {
+    clearInterval(intervalRef.current)
+    return
+  }
+
 
   const hasAnySamples =
     samples.some(s => s && sampleBuffersRef.current[s])
