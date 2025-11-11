@@ -142,23 +142,22 @@ const initAudio = async () => {
 }, [isPlaying, bpm, grid, samples, volumes, muted, pitches, swing])
 
 
- const handlePlayToggle = () => {
-  // create immediately in gesture
+ const handlePlayToggle = async () => {
   if (!audioCtxRef.current) {
     const AudioContext = window.AudioContext || window.webkitAudioContext
     audioCtxRef.current = new AudioContext()
   }
 
-  // resume immediately in the click - no await!
   if (audioCtxRef.current.state === "suspended") {
     audioCtxRef.current.resume()
   }
 
-  // THEN preload anything needed asynchronously AFTER gesture
-  setTimeout(() => {
-    setIsPlaying((prev) => !prev)
-  }, 0)
+  // MUST call initAudio so Safari unlock actually happens
+  await initAudio()
+
+  setIsPlaying((prev) => !prev)
 }
+
 
 
 
@@ -574,7 +573,8 @@ sampleBuffersRef.current[e.target.value] = decoded
   <div>MODEL: DX8-TRK</div>
 </div>
 {/* Audio unlock overlay */}
-{!audioCtxRef.current && (
+{!isPlaying && (
+
   <div
     onClick={handlePlayToggle}
     style={{
