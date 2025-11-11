@@ -583,7 +583,6 @@ const savePattern = () => {
   <div style={{ marginTop: 6 }}>SYS DIAG OK</div>
   <div>MODEL: DX8-TRK</div>
 </div>
-
 {/* Audio unlock overlay */}
 {!audioCtxRef.current && (
   <div
@@ -604,4 +603,8 @@ const savePattern = () => {
     🔊 Tap to Start Audio
   </div>
 )}
+
+</div>  {/* ✅ close the main container */}
+
+)
 
