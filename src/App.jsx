@@ -127,11 +127,42 @@ const initAudio = async () => {
       })
   }, [])
  useEffect(() => {
+  // don't run clock until actually playing AND samples loaded
   if (!isPlaying) {
     clearInterval(intervalRef.current)
     return
   }
+useEffect(() => {
+  const preload = async () => {
+    if (!audioCtxRef.current) return
+    for (const file of availableSamples) {
+      if (!sampleBuffersRef.current[file]) {
+        const res = await fetch(`/${file}`)
+        const buf = await res.arrayBuffer()
+        const decoded = await decode(buf)
+        sampleBuffersRef.current[file] = decoded
+      }
+    }
+  }
+  preload()
+}, [availableSamples])
+
+  const hasAnySamples =
+    samples.some(s => s && sampleBuffersRef.current[s])
+
+  if (!hasAnySamples) return // <-- stops auto ticking with no sounds
+
   intervalRef.current = setInterval(() => {
+    setStep((prev) => {
+      const next = (prev + 1) % STEPS
+      playStep(next)
+      return next
+    })
+  }, getStepTime())
+
+  return () => clearInterval(intervalRef.current)
+}, [isPlaying, bpm, grid, samples, volumes, muted, pitches, swing])
+
     setStep((prev) => {
       const next = (prev + 1) % STEPS
       playStep(next)
