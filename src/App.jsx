@@ -550,7 +550,7 @@ const savePattern = () => {
     Pattern Saved!
   </div>
 )}
-
+Entropy Records Sequencer V1
 {/* ✅ Proper JSX comment, not a block comment */}
 <div
   style={{
