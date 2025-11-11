@@ -140,30 +140,24 @@ const initAudio = async () => {
     return () => clearInterval(intervalRef.current)
   }, [isPlaying, bpm, grid, samples, volumes, muted, pitches, swing])
 
-  const handlePlayToggle = async () => {
-  // Make sure AudioContext exists first
+ const handlePlayToggle = () => {
+  // create immediately in gesture
   if (!audioCtxRef.current) {
     const AudioContext = window.AudioContext || window.webkitAudioContext
     audioCtxRef.current = new AudioContext()
   }
 
-  // ⚡ Synchronously unlock before any awaits
+  // resume immediately in the click - no await!
   if (audioCtxRef.current.state === "suspended") {
-    try {
-      audioCtxRef.current.resume()
-    } catch (err) {
-      console.warn("Immediate resume failed:", err)
-    }
+    audioCtxRef.current.resume()
   }
 
-  // Then do the full init (with silent unlock)
-  await initAudio()
-
-  // Safari sometimes needs a tiny delay before first note
+  // THEN preload anything needed asynchronously AFTER gesture
   setTimeout(() => {
     setIsPlaying((prev) => !prev)
-  }, 50)
+  }, 0)
 }
+
 
 
 
