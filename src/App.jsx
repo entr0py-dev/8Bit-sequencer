@@ -165,7 +165,7 @@ useEffect(() => {
     })
   }, getStepTime())
   return () => clearInterval(intervalRef.current)
-}, [isPlaying, bpm, grid, samples, volumes, muted, pitches, swing])
+}, [isPlaying, bpm, grid, samples, volumes, muted, pitches, swing, unlocked])
 
 
  const handlePlayToggle = async () => {
