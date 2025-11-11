@@ -605,6 +605,6 @@ const savePattern = () => {
 )}
 
 </div>  
-
 )
+}
 
