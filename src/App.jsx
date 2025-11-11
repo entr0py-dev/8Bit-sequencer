@@ -141,7 +141,7 @@ const initAudio = async () => {
     }
   }
   preload()
-}, [availableSamples])
+}, [availableSamples, unlocked])
 useEffect(() => {
   // don't run clock until actually playing AND samples loaded
   if (!isPlaying) {
@@ -169,20 +169,27 @@ useEffect(() => {
 }, [isPlaying, bpm, grid, samples, volumes, muted, pitches, swing, unlocked])
 
 
- const handlePlayToggle = async () => {
+// 1) Only unlock audio — do NOT start transport
+const handleUnlock = () => {
+  // create/resume synchronously in the click
   if (!audioCtxRef.current) {
     const AudioContext = window.AudioContext || window.webkitAudioContext
     audioCtxRef.current = new AudioContext()
   }
-
   if (audioCtxRef.current.state === "suspended") {
+    // resume synchronously (no await)
     audioCtxRef.current.resume()
   }
-
-  // MUST call initAudio so Safari unlock actually happens
-  await initAudio()
+  // optional silent-start + extra resume safety
+  initAudio()
   setUnlocked(true)
+}
 
+// 2) Play button toggles transport. If not unlocked yet, unlock first.
+const handlePlayToggle = async () => {
+  if (!unlocked) {
+    handleUnlock() // don’t await; keep it in the same tick
+  }
   setIsPlaying((prev) => !prev)
 }
 
@@ -604,8 +611,8 @@ sampleBuffersRef.current[e.target.value] = decoded
 {!unlocked && (
 
 
-  <div
-    onClick={handlePlayToggle}
+   <div
+    onClick={handleUnlock}
     style={{
       position: "fixed",
       inset: 0,
