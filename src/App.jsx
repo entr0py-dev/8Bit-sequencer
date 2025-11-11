@@ -141,16 +141,19 @@ const initAudio = async () => {
   }
   preload()
 }, [availableSamples])
- useEffect(() => {
+useEffect(() => {
   // don't run clock until actually playing AND samples loaded
   if (!isPlaying) {
     clearInterval(intervalRef.current)
     return
   }
 
+  // ✅ block autoplay from sample changes
+  if (!unlocked) return
 
   const hasAnySamples =
     samples.some(s => s && sampleBuffersRef.current[s])
+
 
   if (!hasAnySamples) return // <-- stops auto ticking with no sounds
 
