@@ -160,16 +160,6 @@ const initAudio = async () => {
       return next
     })
   }, getStepTime())
-
-  return () => clearInterval(intervalRef.current)
-}, [isPlaying, bpm, grid, samples, volumes, muted, pitches, swing])
-
-    setStep((prev) => {
-      const next = (prev + 1) % STEPS
-      playStep(next)
-      return next
-    })
-  }, getStepTime())
   return () => clearInterval(intervalRef.current)
 }, [isPlaying, bpm, grid, samples, volumes, muted, pitches, swing])
 
