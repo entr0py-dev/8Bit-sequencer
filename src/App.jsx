@@ -47,6 +47,10 @@ const initAudio = async () => {
       console.warn("Silent unlock failed:", err)
     }
   }
+  // SAFARI SAFE DECODE (replace decodeAudioData await)
+  const decode = (arrayBuf) => new Promise((resolve, reject) => {
+  audioCtxRef.current.decodeAudioData(arrayBuf, resolve, reject)
+})
 
   // If context is suspended (Safari often starts this way)
   if (audioCtxRef.current.state === "suspended") {
@@ -99,19 +103,6 @@ const initAudio = async () => {
       const pitch = pitches[trackIndex]
       const volume = volumes[trackIndex]
       const shouldSwing = swing[trackIndex]
-
-      // ✅ SAFARI FIX: decode on demand after user interaction
-      if (!sampleBuffersRef.current[file] && file) {
-        try {
-          const res = await fetch(`/${file}`)
-          const arrayBuffer = await res.arrayBuffer()
-          const audioBuffer = await audioCtxRef.current.decodeAudioData(arrayBuffer)
-          sampleBuffersRef.current[file] = audioBuffer
-        } catch (e) {
-          console.error(`Failed to decode ${file}:`, e)
-          continue // skip this sample
-        }
-      }
 
       const delay = shouldSwing && currentStep % 2 === 1 ? stepTime * 0.2 : 0
       setTimeout(() => {
@@ -370,8 +361,8 @@ const savePattern = () => {
   try {
     const res = await fetch(`/${e.target.value}`)
     const buf = await res.arrayBuffer()
-    const decoded = await audioCtxRef.current.decodeAudioData(buf)
-    sampleBuffersRef.current[e.target.value] = decoded
+    const decoded = await decode(buf)
+sampleBuffersRef.current[e.target.value] = decoded
   } catch (err) {
     console.error("Failed to load sample:", err)
   }
