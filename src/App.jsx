@@ -125,20 +125,31 @@ const initAudio = async () => {
         setSamples((prev) => prev.map((s, i) => s || files[0] || ""))
       })
   }, [])
-  useEffect(() => {
-    if (!isPlaying) {
-      clearInterval(intervalRef.current)
-      return
-    }
-    intervalRef.current = setInterval(() => {
+ useEffect(() => {
+  if (!isPlaying) return
+
+  const ctx = audioCtxRef.current
+  if (!ctx) return
+
+  let lastStepTime = ctx.currentTime
+
+  const tick = () => {
+    const now = ctx.currentTime
+    const interval = (60 / bpm) / 4  // quarter step in seconds
+    if (now - lastStepTime >= interval) {
+      lastStepTime += interval
       setStep((prev) => {
         const next = (prev + 1) % STEPS
         playStep(next)
         return next
       })
-    }, getStepTime())
-    return () => clearInterval(intervalRef.current)
-  }, [isPlaying, bpm, grid, samples, volumes, muted, pitches, swing])
+    }
+    requestAnimationFrame(tick)
+  }
+
+  requestAnimationFrame(tick)
+}, [isPlaying, bpm, grid, samples, volumes, muted, pitches, swing])
+
 
  const handlePlayToggle = () => {
   // create immediately in gesture
