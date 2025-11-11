@@ -234,6 +234,7 @@ const savePattern = () => {
         padding: 20,
         boxSizing: "border-box",
         overflow: "hidden",
+        position: "relative",
       }}
     >
       <style>
@@ -549,17 +550,21 @@ const savePattern = () => {
     Pattern Saved!
   </div>
 )}
-<div style={{
-  position: "absolute",
-  bottom: 20,
-  right: 20,
-  display: "flex",
-  flexDirection: "column",
-  alignItems: "flex-end",
-  fontSize: 8,
-  color: themeStyles.text,
-  opacity: 0.8,
-}}>
+
+/* ✅ Move this block INSIDE the main container */
+<div
+  style={{
+    position: "absolute",
+    bottom: 20,
+    right: 20,
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "flex-end",
+    fontSize: 8,
+    color: themeStyles.text,
+    opacity: 0.8,
+  }}
+>
   <div style={{ display: "flex", gap: 6 }}>
     {[...Array(4)].map((_, i) => (
       <div
@@ -578,6 +583,7 @@ const savePattern = () => {
   <div style={{ marginTop: 6 }}>SYS DIAG OK</div>
   <div>MODEL: DX8-TRK</div>
 </div>
+
 {!audioCtxRef.current && (
   <div
     onClick={handlePlayToggle}
