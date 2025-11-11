@@ -551,7 +551,7 @@ const savePattern = () => {
   </div>
 )}
 
-/* ✅ Move this block INSIDE the main container */
+{/* ✅ Proper JSX comment, not a block comment */}
 <div
   style={{
     position: "absolute",
@@ -584,6 +584,7 @@ const savePattern = () => {
   <div>MODEL: DX8-TRK</div>
 </div>
 
+{/* Audio unlock overlay */}
 {!audioCtxRef.current && (
   <div
     onClick={handlePlayToggle}
@@ -604,6 +605,3 @@ const savePattern = () => {
   </div>
 )}
 
-    </div>
-  )
-}
