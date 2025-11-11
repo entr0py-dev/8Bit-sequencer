@@ -22,7 +22,8 @@ export default function App() {
   const [theme, setTheme] = useState("synthwave")
   const [showSaveToast, setShowSaveToast] = useState(false)
   const [userSamples, setUserSamples] = useState({})
- 
+  const [unlocked, setUnlocked] = useState(false)
+
   const intervalRef = useRef(null)
   const audioCtxRef = useRef(null)
   const sampleBuffersRef = useRef({})
@@ -176,6 +177,7 @@ const initAudio = async () => {
 
   // MUST call initAudio so Safari unlock actually happens
   await initAudio()
+  setUnlocked(true)
 
   setIsPlaying((prev) => !prev)
 }
@@ -595,7 +597,8 @@ sampleBuffersRef.current[e.target.value] = decoded
   <div>MODEL: DX8-TRK</div>
 </div>
 {/* Audio unlock overlay */}
-{!isPlaying && (
+{!unlocked && (
+
 
   <div
     onClick={handlePlayToggle}
