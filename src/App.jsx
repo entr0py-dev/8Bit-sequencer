@@ -26,6 +26,10 @@ export default function App() {
   const intervalRef = useRef(null)
   const audioCtxRef = useRef(null)
   const sampleBuffersRef = useRef({})
+// SAFARI SAFE DECODE (global)
+const decode = (arrayBuf) => new Promise((resolve, reject) => {
+  audioCtxRef.current.decodeAudioData(arrayBuf, resolve, reject)
+})
 
   const getStepTime = () => (60 / bpm) * 1000 / 4
 
@@ -47,10 +51,7 @@ const initAudio = async () => {
       console.warn("Silent unlock failed:", err)
     }
   }
-  // SAFARI SAFE DECODE (replace decodeAudioData await)
-  const decode = (arrayBuf) => new Promise((resolve, reject) => {
-  audioCtxRef.current.decodeAudioData(arrayBuf, resolve, reject)
-})
+
 
   // If context is suspended (Safari often starts this way)
   if (audioCtxRef.current.state === "suspended") {
