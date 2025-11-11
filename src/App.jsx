@@ -604,7 +604,7 @@ const savePattern = () => {
   </div>
 )}
 
-</div>  {/* ✅ close the main container */}
+</div>  
 
 )
 
