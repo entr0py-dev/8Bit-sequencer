@@ -29,16 +29,36 @@ export default function App() {
 
   const getStepTime = () => (60 / bpm) * 1000 / 4
 
+// --- SAFARI-SAFE AUDIO INIT ---
 const initAudio = async () => {
   if (!audioCtxRef.current) {
     const AudioContext = window.AudioContext || window.webkitAudioContext
     audioCtxRef.current = new AudioContext()
+
+    // 🔇 Silent "unlock" buffer (some Safari versions need a real sound)
+    const ctx = audioCtxRef.current
+    const buffer = ctx.createBuffer(1, 1, 22050)
+    const source = ctx.createBufferSource()
+    source.buffer = buffer
+    source.connect(ctx.destination)
+    try {
+      source.start(0)
+    } catch (err) {
+      console.warn("Silent unlock failed:", err)
+    }
   }
 
+  // If context is suspended (Safari often starts this way)
   if (audioCtxRef.current.state === "suspended") {
-    await audioCtxRef.current.resume()
+    try {
+      await audioCtxRef.current.resume()
+      console.log("AudioContext resumed ✅")
+    } catch (err) {
+      console.error("AudioContext resume failed:", err)
+    }
   }
 }
+
 
 
  
@@ -130,15 +150,30 @@ const initAudio = async () => {
   }, [isPlaying, bpm, grid, samples, volumes, muted, pitches, swing])
 
   const handlePlayToggle = async () => {
-  await initAudio()
-
-  // ✅ Fix: ensure audio context resumes on user interaction
-  if (audioCtxRef.current?.state === "suspended") {
-    await audioCtxRef.current.resume()
+  // Make sure AudioContext exists first
+  if (!audioCtxRef.current) {
+    const AudioContext = window.AudioContext || window.webkitAudioContext
+    audioCtxRef.current = new AudioContext()
   }
 
-  setIsPlaying((prev) => !prev)
+  // ⚡ Synchronously unlock before any awaits
+  if (audioCtxRef.current.state === "suspended") {
+    try {
+      audioCtxRef.current.resume()
+    } catch (err) {
+      console.warn("Immediate resume failed:", err)
+    }
+  }
+
+  // Then do the full init (with silent unlock)
+  await initAudio()
+
+  // Safari sometimes needs a tiny delay before first note
+  setTimeout(() => {
+    setIsPlaying((prev) => !prev)
+  }, 50)
 }
+
 
 
 const savePattern = () => {
@@ -543,6 +578,25 @@ const savePattern = () => {
   <div style={{ marginTop: 6 }}>SYS DIAG OK</div>
   <div>MODEL: DX8-TRK</div>
 </div>
+{!audioCtxRef.current && (
+  <div
+    onClick={handlePlayToggle}
+    style={{
+      position: "fixed",
+      inset: 0,
+      background: "#000",
+      color: "#0ff",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      fontSize: 20,
+      zIndex: 9999,
+      cursor: "pointer",
+    }}
+  >
+    🔊 Tap to Start Audio
+  </div>
+)}
 
     </div>
   )
