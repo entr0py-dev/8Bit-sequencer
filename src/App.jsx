@@ -197,21 +197,30 @@ const handlePlayToggle = async () => {
 
 
 
+// --- REPLACE YOUR EXISTING savePattern FUNCTION WITH THIS ---
 const savePattern = () => {
-  const pattern = {
-    grid,
-    bpm,
-    samples,
-    volumes,
-    muted,
-    swing,
-    pitches,
-  }
-  localStorage.setItem("sequencerPattern", JSON.stringify(pattern))
-  setShowSaveToast(true)
-  setTimeout(() => setShowSaveToast(false), 2000)
-}
+    const pattern = {
+        grid,
+        bpm,
+        samples,
+        volumes,
+        muted,
+        swing,
+        pitches,
+    }
+    localStorage.setItem("sequencerPattern", JSON.stringify(pattern))
+    setShowSaveToast(true)
+    setTimeout(() => setShowSaveToast(false), 2000)
 
+    // --- NEW: Signal Parent Window (Framer) ---
+    // This tells the main site to complete the quest
+    if (window.parent) {
+        window.parent.postMessage({
+            type: "QUEST_TRIGGER",
+            questTitle: "FREDERICK"
+        }, "*")
+    }
+}
 
   const loadPattern = () => {
     const pattern = JSON.parse(localStorage.getItem("sequencerPattern"))
