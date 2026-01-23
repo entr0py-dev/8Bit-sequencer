@@ -23,52 +23,50 @@ export default function App() {
   const [showSaveToast, setShowSaveToast] = useState(false)
   const [userSamples, setUserSamples] = useState({})
   const [unlocked, setUnlocked] = useState(false)
+  
+  // New State for Pop-up Hints
+  const [showHelp, setShowHelp] = useState(false)
 
   const intervalRef = useRef(null)
   const audioCtxRef = useRef(null)
   const sampleBuffersRef = useRef({})
-// SAFARI SAFE DECODE (global)
-const decode = (arrayBuf) => new Promise((resolve, reject) => {
-  audioCtxRef.current.decodeAudioData(arrayBuf, resolve, reject)
-})
+
+  // SAFARI SAFE DECODE (global)
+  const decode = (arrayBuf) => new Promise((resolve, reject) => {
+    audioCtxRef.current.decodeAudioData(arrayBuf, resolve, reject)
+  })
 
   const getStepTime = () => (60 / bpm) * 1000 / 4
 
-// --- SAFARI-SAFE AUDIO INIT ---
-const initAudio = async () => {
-  if (!audioCtxRef.current) {
-    const AudioContext = window.AudioContext || window.webkitAudioContext
-    audioCtxRef.current = new AudioContext()
+  // --- SAFARI-SAFE AUDIO INIT ---
+  const initAudio = async () => {
+    if (!audioCtxRef.current) {
+      const AudioContext = window.AudioContext || window.webkitAudioContext
+      audioCtxRef.current = new AudioContext()
 
-    // 🔇 Silent "unlock" buffer (some Safari versions need a real sound)
-    const ctx = audioCtxRef.current
-    const buffer = ctx.createBuffer(1, 1, 22050)
-    const source = ctx.createBufferSource()
-    source.buffer = buffer
-    source.connect(ctx.destination)
-    try {
-      source.start(0)
-    } catch (err) {
-      console.warn("Silent unlock failed:", err)
+      // 🔇 Silent "unlock" buffer (some Safari versions need a real sound)
+      const ctx = audioCtxRef.current
+      const buffer = ctx.createBuffer(1, 1, 22050)
+      const source = ctx.createBufferSource()
+      source.buffer = buffer
+      source.connect(ctx.destination)
+      try {
+        source.start(0)
+      } catch (err) {
+        console.warn("Silent unlock failed:", err)
+      }
+    }
+
+    // If context is suspended (Safari often starts this way)
+    if (audioCtxRef.current.state === "suspended") {
+      try {
+        await audioCtxRef.current.resume()
+        console.log("AudioContext resumed ✅")
+      } catch (err) {
+        console.error("AudioContext resume failed:", err)
+      }
     }
   }
-
-
-  // If context is suspended (Safari often starts this way)
-  if (audioCtxRef.current.state === "suspended") {
-    try {
-      await audioCtxRef.current.resume()
-      console.log("AudioContext resumed ✅")
-    } catch (err) {
-      console.error("AudioContext resume failed:", err)
-    }
-  }
-}
-
-
-
- 
-
 
   const playSample = (sample, volume = 1, pitch = 1) => {
     const ctx = audioCtxRef.current
@@ -84,40 +82,38 @@ const initAudio = async () => {
   }
 
   const toggleStep = (row, col) => {
-  setGrid((prev) => {
-    const copy = prev.map((r) => [...r])
-    copy[row][col] = !copy[row][col]
-    return copy
-  })
-}
-
+    setGrid((prev) => {
+      const copy = prev.map((r) => [...r])
+      copy[row][col] = !copy[row][col]
+      return copy
+    })
+  }
   
   const playStep = async (currentStep) => {
-  const stepTime = getStepTime()
-  const newTriggers = Array(TRACKS).fill(false)
+    const stepTime = getStepTime()
+    const newTriggers = Array(TRACKS).fill(false)
 
-  for (let trackIndex = 0; trackIndex < TRACKS; trackIndex++) {
-    const row = grid[trackIndex]
-    const isActive = row[currentStep]
+    for (let trackIndex = 0; trackIndex < TRACKS; trackIndex++) {
+      const row = grid[trackIndex]
+      const isActive = row[currentStep]
 
-    if (isActive && !muted[trackIndex]) {
-      const file = samples[trackIndex]
-      const pitch = pitches[trackIndex]
-      const volume = volumes[trackIndex]
-      const shouldSwing = swing[trackIndex]
+      if (isActive && !muted[trackIndex]) {
+        const file = samples[trackIndex]
+        const pitch = pitches[trackIndex]
+        const volume = volumes[trackIndex]
+        const shouldSwing = swing[trackIndex]
 
-      const delay = shouldSwing && currentStep % 2 === 1 ? stepTime * 0.2 : 0
-      setTimeout(() => {
-        playSample(file, volume, pitch)
-      }, delay)
+        const delay = shouldSwing && currentStep % 2 === 1 ? stepTime * 0.2 : 0
+        setTimeout(() => {
+          playSample(file, volume, pitch)
+        }, delay)
 
-      newTriggers[trackIndex] = true
+        newTriggers[trackIndex] = true
+      }
     }
+
+    setTriggeredSteps(newTriggers)
   }
-
-  setTriggeredSteps(newTriggers)
-}
-
 
   useEffect(() => {
     fetch("/samples.json")
@@ -127,86 +123,83 @@ const initAudio = async () => {
         setSamples((prev) => prev.map((s, i) => s || files[0] || ""))
       })
   }, [])
+
   useEffect(() => {
     if (!unlocked) return
-  const preload = async () => {
-    if (!audioCtxRef.current) return
-    for (const file of availableSamples) {
-      if (!sampleBuffersRef.current[file]) {
-        const res = await fetch(`/${file}`)
-        const buf = await res.arrayBuffer()
-        const decoded = await decode(buf)
-        sampleBuffersRef.current[file] = decoded
+    const preload = async () => {
+      if (!audioCtxRef.current) return
+      for (const file of availableSamples) {
+        if (!sampleBuffersRef.current[file]) {
+          const res = await fetch(`/${file}`)
+          const buf = await res.arrayBuffer()
+          const decoded = await decode(buf)
+          sampleBuffersRef.current[file] = decoded
+        }
       }
     }
+    preload()
+  }, [availableSamples, unlocked])
+
+  useEffect(() => {
+    // don't run clock until actually playing AND samples loaded
+    if (!isPlaying) {
+      clearInterval(intervalRef.current)
+      return
+    }
+
+    // ✅ block autoplay from sample changes
+    if (!unlocked) return
+
+    const hasAnySamples =
+      samples.some(s => s && sampleBuffersRef.current[s])
+
+
+    if (!hasAnySamples) return // <-- stops auto ticking with no sounds
+
+    intervalRef.current = setInterval(() => {
+      setStep((prev) => {
+        const next = (prev + 1) % STEPS
+        playStep(next)
+        return next
+      })
+    }, getStepTime())
+    return () => clearInterval(intervalRef.current)
+  }, [isPlaying, bpm, grid, samples, volumes, muted, pitches, swing, unlocked])
+
+
+  // 1) Only unlock audio — do NOT start transport
+  const handleUnlock = () => {
+    // create/resume synchronously in the click
+    if (!audioCtxRef.current) {
+      const AudioContext = window.AudioContext || window.webkitAudioContext
+      audioCtxRef.current = new AudioContext()
+    }
+    if (audioCtxRef.current.state === "suspended") {
+      // resume synchronously (no await)
+      audioCtxRef.current.resume()
+    }
+    // optional silent-start + extra resume safety
+    initAudio()
+    setUnlocked(true)
   }
-  preload()
-}, [availableSamples, unlocked])
-useEffect(() => {
-  // don't run clock until actually playing AND samples loaded
-  if (!isPlaying) {
-    clearInterval(intervalRef.current)
-    return
+
+  // 2) Play button toggles transport. If not unlocked yet, unlock first.
+  const handlePlayToggle = async () => {
+    if (!unlocked) {
+      handleUnlock() // don’t await; keep it in the same tick
+    }
+    setIsPlaying((prev) => !prev)
   }
 
-  // ✅ block autoplay from sample changes
-  if (!unlocked) return
-
-  const hasAnySamples =
-    samples.some(s => s && sampleBuffersRef.current[s])
-
-
-  if (!hasAnySamples) return // <-- stops auto ticking with no sounds
-
-  intervalRef.current = setInterval(() => {
-    setStep((prev) => {
-      const next = (prev + 1) % STEPS
-      playStep(next)
-      return next
-    })
-  }, getStepTime())
-  return () => clearInterval(intervalRef.current)
-}, [isPlaying, bpm, grid, samples, volumes, muted, pitches, swing, unlocked])
-
-
-// 1) Only unlock audio — do NOT start transport
-const handleUnlock = () => {
-  // create/resume synchronously in the click
-  if (!audioCtxRef.current) {
-    const AudioContext = window.AudioContext || window.webkitAudioContext
-    audioCtxRef.current = new AudioContext()
-  }
-  if (audioCtxRef.current.state === "suspended") {
-    // resume synchronously (no await)
-    audioCtxRef.current.resume()
-  }
-  // optional silent-start + extra resume safety
-  initAudio()
-  setUnlocked(true)
-}
-
-// 2) Play button toggles transport. If not unlocked yet, unlock first.
-const handlePlayToggle = async () => {
-  if (!unlocked) {
-    handleUnlock() // don’t await; keep it in the same tick
-  }
-  setIsPlaying((prev) => !prev)
-}
-
-
-
-
-
-// --- REPLACE YOUR EXISTING savePattern FUNCTION WITH THIS ---
-const savePattern = () => {
+  const savePattern = () => {
     const pattern = {
-        grid,
-        bpm,
-        samples,
-        volumes,
-        muted,
-        swing,
-        pitches,
+      grid,
+      bpm,
+      samples,
+      volumes,
+      muted,
+      swing,
+      pitches,
     }
     localStorage.setItem("sequencerPattern", JSON.stringify(pattern))
     setShowSaveToast(true)
@@ -215,12 +208,12 @@ const savePattern = () => {
     // --- NEW: Signal Parent Window (Framer) ---
     // This tells the main site to complete the quest
     if (window.parent) {
-        window.parent.postMessage({
-            type: "QUEST_TRIGGER",
-            questTitle: "FREDERICK"
-        }, "*")
+      window.parent.postMessage({
+        type: "QUEST_TRIGGER",
+        questTitle: "FREDERICK"
+      }, "*")
     }
-}
+  }
 
   const loadPattern = () => {
     const pattern = JSON.parse(localStorage.getItem("sequencerPattern"))
@@ -250,6 +243,47 @@ const savePattern = () => {
 
   const themeStyles = colors[theme]
 
+  // --- INTERNAL COMPONENTS ---
+
+  const SectionTitle = ({ children }) => (
+    <div style={{
+      fontSize: 12,
+      fontWeight: 'bold',
+      color: themeStyles.text,
+      borderBottom: `2px solid ${themeStyles.highlight}`,
+      paddingBottom: 4,
+      marginBottom: 12,
+      marginTop: 20,
+      textTransform: 'uppercase',
+      letterSpacing: 2,
+      width: 'fit-content'
+    }}>
+      {children}
+    </div>
+  )
+
+  const Hint = ({ children, style }) => {
+    if (!showHelp) return null;
+    return (
+      <div style={{
+        position: 'absolute',
+        background: themeStyles.bg,
+        border: `1px dashed ${themeStyles.highlight}`,
+        color: themeStyles.highlight,
+        padding: '6px 8px',
+        fontSize: '8px',
+        zIndex: 100,
+        pointerEvents: 'none',
+        maxWidth: '140px',
+        lineHeight: '1.4',
+        boxShadow: `2px 2px 0px ${themeStyles.text}`,
+        ...style
+      }}>
+        💡 {children}
+      </div>
+    )
+  }
+
   return (
     <div
       style={{
@@ -271,7 +305,8 @@ const savePattern = () => {
         {`@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');`}
       </style>
 
-      <div style={{ marginBottom: 16, display: "flex", alignItems: "center", gap: 12 }}>
+      {/* TOP BAR */}
+      <div style={{ marginBottom: 16, display: "flex", alignItems: "center", gap: 12, position: 'relative' }}>
         <button
           onClick={handlePlayToggle}
           style={{
@@ -328,39 +363,40 @@ const savePattern = () => {
           Load
         </button>
         <input
-  type="file"
-  accept=".wav,.mp3"
-  onChange={(e) => {
-    const file = e.target.files[0]
-    if (!file) return
+          type="file"
+          accept=".wav,.mp3"
+          onChange={(e) => {
+            const file = e.target.files[0]
+            if (!file) return
 
-    const reader = new FileReader()
-    reader.onload = async () => {
-      try {
-        if (!audioCtxRef.current) {
-          const AudioContext = window.AudioContext || window.webkitAudioContext
-          audioCtxRef.current = new AudioContext()
-        }
-        const arrayBuffer = reader.result
-        const audioBuffer = await audioCtxRef.current.decodeAudioData(arrayBuffer)
-        sampleBuffersRef.current[file.name] = audioBuffer
-        setUserSamples((prev) => ({ ...prev, [file.name]: audioBuffer }))
-      } catch (err) {
-        console.error("Upload decode failed:", err)
-      }
-    }
-    reader.readAsArrayBuffer(file)
-  }}
-  style={{
-    padding: 6,
-    fontSize: 10,
-    color: themeStyles.text,
-    background: themeStyles.bg,
-    border: "1px solid " + themeStyles.text,
-    marginLeft: 8,
-  }}
-          />
+            const reader = new FileReader()
+            reader.onload = async () => {
+              try {
+                if (!audioCtxRef.current) {
+                  const AudioContext = window.AudioContext || window.webkitAudioContext
+                  audioCtxRef.current = new AudioContext()
+                }
+                const arrayBuffer = reader.result
+                const audioBuffer = await audioCtxRef.current.decodeAudioData(arrayBuffer)
+                sampleBuffersRef.current[file.name] = audioBuffer
+                setUserSamples((prev) => ({ ...prev, [file.name]: audioBuffer }))
+              } catch (err) {
+                console.error("Upload decode failed:", err)
+              }
+            }
+            reader.readAsArrayBuffer(file)
+          }}
+          style={{
+            padding: 6,
+            fontSize: 10,
+            color: themeStyles.text,
+            background: themeStyles.bg,
+            border: "1px solid " + themeStyles.text,
+            marginLeft: 8,
+          }}
+        />
 
+        {/* Theme Toggle */}
         <button
           onClick={() => setTheme((prev) => (prev === "synthwave" ? "crt" : "synthwave"))}
           style={{
@@ -372,10 +408,39 @@ const savePattern = () => {
             cursor: "pointer",
           }}
         />
+
+        {/* HELP TOGGLE */}
+        <button
+          onClick={() => setShowHelp(!showHelp)}
+          style={{
+            width: 40,
+            height: 40,
+            border: "2px solid " + themeStyles.text,
+            background: showHelp ? themeStyles.text : "transparent",
+            color: showHelp ? themeStyles.bg : themeStyles.text,
+            cursor: "pointer",
+            fontSize: 16,
+            fontWeight: "bold"
+          }}
+          title="Toggle Hints"
+        >
+          ?
+        </button>
+
+        <Hint style={{ top: 50, left: 10 }}>Start/Stop, Set Speed (BPM)</Hint>
+        <Hint style={{ top: 50, left: 300 }}>Save/Load beats to local storage</Hint>
+        <Hint style={{ top: 50, right: 60 }}>Switch Visual Theme</Hint>
+
       </div>
 
+      <SectionTitle>MIXER</SectionTitle>
+
       {/* Track Controls */}
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 16, marginBottom: 24 }}>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 16, marginBottom: 10, position: 'relative' }}>
+        <Hint style={{ top: -10, left: 200, zIndex: 200 }}>
+          Change Samples, Volume, Pitch, or add Swing to individual tracks here.
+        </Hint>
+
         {samples.map((sample, i) => (
           <div key={i} style={{ width: 220 }}>
             <div style={{ fontSize: 10, marginBottom: 4 }}>Track {i + 1}</div>
@@ -383,31 +448,31 @@ const savePattern = () => {
             <select
               value={sample}
               onChange={async (e) => {
-  const newSamples = [...samples]
-  newSamples[i] = e.target.value
-  setSamples(newSamples)
+                const newSamples = [...samples]
+                newSamples[i] = e.target.value
+                setSamples(newSamples)
 
-  // ✅ Fix: Ensure AudioContext exists
-  if (!audioCtxRef.current) {
-    const AudioContext = window.AudioContext || window.webkitAudioContext
-    audioCtxRef.current = new AudioContext()
-  }
+                // ✅ Fix: Ensure AudioContext exists
+                if (!audioCtxRef.current) {
+                  const AudioContext = window.AudioContext || window.webkitAudioContext
+                  audioCtxRef.current = new AudioContext()
+                }
 
- if (!sampleBuffersRef.current[e.target.value] && e.target.value) {
-  // Skip fetch if it's a user-uploaded sample
-  if (userSamples[e.target.value]) return
+                if (!sampleBuffersRef.current[e.target.value] && e.target.value) {
+                  // Skip fetch if it's a user-uploaded sample
+                  if (userSamples[e.target.value]) return
 
-  try {
-    const res = await fetch(`/${e.target.value}`)
-    const buf = await res.arrayBuffer()
-    const decoded = await decode(buf)
-sampleBuffersRef.current[e.target.value] = decoded
-  } catch (err) {
-    console.error("Failed to load sample:", err)
-  }
-}
+                  try {
+                    const res = await fetch(`/${e.target.value}`)
+                    const buf = await res.arrayBuffer()
+                    const decoded = await decode(buf)
+                    sampleBuffersRef.current[e.target.value] = decoded
+                  } catch (err) {
+                    console.error("Failed to load sample:", err)
+                  }
+                }
 
-}}
+              }}
 
               style={{
                 width: "100%",
@@ -491,9 +556,39 @@ sampleBuffersRef.current[e.target.value] = decoded
           </div>
         ))}
       </div>
+
+      <SectionTitle>SEQUENCE GRID</SectionTitle>
+
       {/* Sequencer Grid & VU Meters */}
-      <div style={{ display: "flex", overflow: "hidden" }}>
+      <div style={{ display: "flex", overflow: "hidden", marginTop: 20 }}>
+        
+        {/* The Grid Container - Moved down slightly to fit numbers */}
         <div style={{ position: "relative", width: STEPS * (CELL_SIZE + STEP_GAP) }}>
+          
+          <Hint style={{ top: 50, left: 100, zIndex: 150 }}>
+            Click cells to program the beat. Horizontal = Time, Vertical = Track.
+          </Hint>
+
+          {/* Step Numbers Header */}
+          {Array(STEPS).fill(0).map((_, i) => (
+            <div
+              key={`num-${i}`}
+              style={{
+                position: "absolute",
+                top: -20, // Sit above the cells
+                left: i * (CELL_SIZE + STEP_GAP),
+                width: CELL_SIZE,
+                textAlign: "center",
+                fontSize: 8,
+                color: themeStyles.text,
+                opacity: 0.7
+              }}
+            >
+              {i + 1}
+            </div>
+          ))}
+
+          {/* Grid Cells */}
           {grid.map((row, rowIndex) =>
             row.map((isActive, colIndex) => {
               const isCurrent = colIndex === step
@@ -502,8 +597,8 @@ sampleBuffersRef.current[e.target.value] = decoded
                   ? themeStyles.highlight
                   : "#333"
                 : isActive
-                ? themeStyles.text
-                : "#111"
+                  ? themeStyles.text
+                  : "#111"
               return (
                 <div
                   key={`${rowIndex}-${colIndex}`}
@@ -526,7 +621,8 @@ sampleBuffersRef.current[e.target.value] = decoded
         </div>
 
         {/* VU Meters */}
-        <div style={{ marginLeft: 24, display: "flex", flexDirection: "column", gap: STEP_GAP }}>
+        <div style={{ marginLeft: 24, display: "flex", flexDirection: "column", gap: STEP_GAP, position: 'relative' }}>
+          <Hint style={{ right: 30, top: 0, width: 80 }}>Live visual feedback</Hint>
           {triggeredSteps.map((active, i) => (
             <div
               key={i}
@@ -564,82 +660,81 @@ sampleBuffersRef.current[e.target.value] = decoded
         </div>
       </div>
       {showSaveToast && (
-  <div
-    style={{
-      position: "absolute",
-      top: 20,
-      right: 20,
-      background: themeStyles.highlight,
-      color: themeStyles.bg,
-      padding: "8px 16px",
-      fontSize: 10,
-      border: `2px solid ${themeStyles.text}`,
-      zIndex: 999,
-    }}
-  >
-    Pattern Saved!
-  </div>
-)}
-<div style={{fontSize:10, marginTop:10}}>
-  Entropy Records Sequencer V1
-</div>
+        <div
+          style={{
+            position: "absolute",
+            top: 20,
+            right: 20,
+            background: themeStyles.highlight,
+            color: themeStyles.bg,
+            padding: "8px 16px",
+            fontSize: 10,
+            border: `2px solid ${themeStyles.text}`,
+            zIndex: 999,
+          }}
+        >
+          Pattern Saved!
+        </div>
+      )}
+      <div style={{ fontSize: 10, marginTop: 10 }}>
+        Entropy Records Sequencer V1
+      </div>
 
-{/* ✅ Proper JSX comment, not a block comment */}
-<div
-  style={{
-    position: "absolute",
-    bottom: 20,
-    right: 20,
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "flex-end",
-    fontSize: 8,
-    color: themeStyles.text,
-    opacity: 0.8,
-  }}
->
-  <div style={{ display: "flex", gap: 6 }}>
-    {[...Array(4)].map((_, i) => (
+      {/* ✅ Proper JSX comment, not a block comment */}
       <div
-        key={i}
         style={{
-          width: 10,
-          height: 10,
-          borderRadius: "50%",
-          background: Math.random() > 0.5 ? themeStyles.highlight : "#222",
-          boxShadow: "0 0 4px " + themeStyles.highlight,
-          transition: "opacity 0.3s",
+          position: "absolute",
+          bottom: 20,
+          right: 20,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "flex-end",
+          fontSize: 8,
+          color: themeStyles.text,
+          opacity: 0.8,
         }}
-      />
-    ))}
-  </div>
-  <div style={{ marginTop: 6 }}>SYS DIAG OK</div>
-  <div>MODEL: DX8-TRK</div>
-</div>
-{/* Audio unlock overlay */}
-{!unlocked && (
+      >
+        <div style={{ display: "flex", gap: 6 }}>
+          {[...Array(4)].map((_, i) => (
+            <div
+              key={i}
+              style={{
+                width: 10,
+                height: 10,
+                borderRadius: "50%",
+                background: Math.random() > 0.5 ? themeStyles.highlight : "#222",
+                boxShadow: "0 0 4px " + themeStyles.highlight,
+                transition: "opacity 0.3s",
+              }}
+            />
+          ))}
+        </div>
+        <div style={{ marginTop: 6 }}>SYS DIAG OK</div>
+        <div>MODEL: DX8-TRK</div>
+      </div>
+      {/* Audio unlock overlay */}
+      {!unlocked && (
 
 
-   <div
-    onClick={handleUnlock}
-    style={{
-      position: "fixed",
-      inset: 0,
-      background: "#000",
-      color: "#0ff",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      fontSize: 20,
-      zIndex: 9999,
-      cursor: "pointer",
-    }}
-  >
-    🔊 Tap to Start Audio
-  </div>
-)}
+        <div
+          onClick={handleUnlock}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "#000",
+            color: "#0ff",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: 20,
+            zIndex: 9999,
+            cursor: "pointer",
+          }}
+        >
+          🔊 Tap to Start Audio
+        </div>
+      )}
 
-</div>  
-)
+    </div>
+  )
 }
-
