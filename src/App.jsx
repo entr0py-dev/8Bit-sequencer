@@ -272,7 +272,7 @@ export default function App() {
         color: themeStyles.highlight,
         padding: '6px 8px',
         fontSize: '8px',
-        zIndex: 100,
+        zIndex: 200, // Increased z-index
         pointerEvents: 'none',
         maxWidth: '140px',
         lineHeight: '1.4',
@@ -297,7 +297,9 @@ export default function App() {
         margin: "auto",
         padding: 20,
         boxSizing: "border-box",
-        overflow: "hidden",
+        // ✅ CHANGED: allow vertical scrolling if content is too tall
+        overflowY: "auto",
+        overflowX: "hidden", 
         position: "relative",
       }}
     >
@@ -437,7 +439,8 @@ export default function App() {
 
       {/* Track Controls */}
       <div style={{ display: "flex", flexWrap: "wrap", gap: 16, marginBottom: 10, position: 'relative' }}>
-        <Hint style={{ top: -10, left: 200, zIndex: 200 }}>
+        {/* ✅ MOVED HINT: Higher up (top: -45) and further right (left: 260) to avoid overlapping Track 1 */}
+        <Hint style={{ top: -45, left: 260, zIndex: 200, width: 200 }}>
           Change Samples, Volume, Pitch, or add Swing to individual tracks here.
         </Hint>
 
@@ -560,12 +563,42 @@ export default function App() {
       <SectionTitle>SEQUENCE GRID</SectionTitle>
 
       {/* Sequencer Grid & VU Meters */}
-      <div style={{ display: "flex", overflow: "hidden", marginTop: 20 }}>
+      <div style={{ display: "flex", overflow: "visible", marginTop: 20 }}>
         
-        {/* The Grid Container - Moved down slightly to fit numbers */}
-        <div style={{ position: "relative", width: STEPS * (CELL_SIZE + STEP_GAP) }}>
+        {/* ✅ NEW: Row Labels (Track Numbers) */}
+        <div style={{ 
+          display: 'flex', 
+          flexDirection: 'column', 
+          marginRight: 8, 
+          paddingTop: 0 // Align with grid top
+        }}>
+           {/* Spacer to align with column numbers */}
+           <div style={{ height: 20 }} /> 
+           {Array(TRACKS).fill(0).map((_, i) => (
+             <div key={`row-label-${i}`} style={{
+                height: CELL_SIZE,
+                marginTop: i === 0 ? 0 : STEP_GAP,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'flex-end',
+                fontSize: 8,
+                color: themeStyles.text,
+                opacity: 0.8
+             }}>
+                T{i + 1}
+             </div>
+           ))}
+        </div>
+
+        {/* The Grid Container */}
+        {/* ✅ CHANGED: Added explicit height to prevent 0px height collapse due to absolute children */}
+        <div style={{ 
+          position: "relative", 
+          width: STEPS * (CELL_SIZE + STEP_GAP),
+          height: TRACKS * (CELL_SIZE + STEP_GAP) 
+        }}>
           
-          <Hint style={{ top: 50, left: 100, zIndex: 150 }}>
+          <Hint style={{ top: -50, left: 150, zIndex: 150 }}>
             Click cells to program the beat. Horizontal = Time, Vertical = Track.
           </Hint>
 
@@ -575,7 +608,7 @@ export default function App() {
               key={`num-${i}`}
               style={{
                 position: "absolute",
-                top: -20, // Sit above the cells
+                top: -15, // Sit above the cells
                 left: i * (CELL_SIZE + STEP_GAP),
                 width: CELL_SIZE,
                 textAlign: "center",
@@ -622,7 +655,11 @@ export default function App() {
 
         {/* VU Meters */}
         <div style={{ marginLeft: 24, display: "flex", flexDirection: "column", gap: STEP_GAP, position: 'relative' }}>
-          <Hint style={{ right: 30, top: 0, width: 80 }}>Live visual feedback</Hint>
+          <Hint style={{ right: 30, top: -20, width: 80 }}>Live visual feedback</Hint>
+          
+          {/* Spacer to align with grid rows (skipping column header space) */}
+           <div style={{ height: 0 }} /> 
+
           {triggeredSteps.map((active, i) => (
             <div
               key={i}
