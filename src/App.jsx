@@ -230,13 +230,13 @@ export default function App() {
 
   const SectionTitle = ({ children }) => (
     <div style={{
-      fontSize: 10, // Smaller font
+      fontSize: 10,
       fontWeight: 'bold',
       color: themeStyles.text,
       borderBottom: `2px solid ${themeStyles.highlight}`,
       paddingBottom: 2,
       marginBottom: 8,
-      marginTop: 12, // Reduced margin
+      marginTop: 12,
       textTransform: 'uppercase',
       letterSpacing: 2,
       width: 'fit-content'
@@ -280,7 +280,7 @@ export default function App() {
         margin: "auto",
         padding: 20,
         boxSizing: "border-box",
-        overflow: "hidden", // ✅ Fixed: No scrolling
+        overflow: "hidden", 
         position: "relative",
       }}
     >
@@ -296,7 +296,7 @@ export default function App() {
             background: themeStyles.highlight,
             color: themeStyles.bg,
             fontWeight: "bold",
-            fontSize: 10, // Smaller
+            fontSize: 10, 
             padding: "6px 12px",
             border: "2px solid " + themeStyles.text,
             cursor: "pointer",
@@ -419,13 +419,13 @@ export default function App() {
       {/* Track Controls */}
       <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 8, position: 'relative' }}>
         
-        {/* ✅ MOVED HINT: To bottom right of screen (fixed position relative to container) */}
-        <Hint style={{ position: 'fixed', bottom: 80, right: 80, zIndex: 200, width: 220 }}>
-          Mixer Tip: Change Samples, Volume, Pitch, or add Swing to individual tracks.
+        {/* ✅ MOVED HINT: Higher up and Inset from corner */}
+        <Hint style={{ position: 'fixed', bottom: 160, right: 60, zIndex: 200, width: 220 }}>
+          MIXER TIP: Try adding your own samples, and tweaking individual tracks swing, pitch and volume in the mixer
         </Hint>
 
         {samples.map((sample, i) => (
-          <div key={i} style={{ width: 160 }}> {/* ✅ Reduced width from 220 to 160 */}
+          <div key={i} style={{ width: 160 }}> 
             <div style={{ fontSize: 8, marginBottom: 2 }}>Track {i + 1}</div>
 
             <select
@@ -453,7 +453,7 @@ export default function App() {
               style={{
                 width: "100%",
                 padding: 2,
-                fontSize: 8, // Smaller font
+                fontSize: 8,
                 background: "#111",
                 color: themeStyles.text,
                 fontFamily: "inherit",
@@ -570,24 +570,11 @@ export default function App() {
           <Hint style={{ top: -40, left: 150, zIndex: 150 }}>
             Click cells to program the beat.
           </Hint>
-
-          {Array(STEPS).fill(0).map((_, i) => (
-            <div
-              key={`num-${i}`}
-              style={{
-                position: "absolute",
-                top: -12,
-                left: i * (CELL_SIZE + STEP_GAP),
-                width: CELL_SIZE,
-                textAlign: "center",
-                fontSize: 7,
-                color: themeStyles.text,
-                opacity: 0.7
-              }}
-            >
-              {i + 1}
-            </div>
-          ))}
+          
+          {/* ✅ STEP NUMBERS REMOVED HERE 
+              The layout remains preserved because the grid cells 
+              are absolutely positioned relative to this container.
+          */}
 
           {grid.map((row, rowIndex) =>
             row.map((isActive, colIndex) => {
@@ -622,7 +609,6 @@ export default function App() {
 
         {/* VU Meters */}
         <div style={{ marginLeft: 16, display: "flex", flexDirection: "column", gap: STEP_GAP, position: 'relative' }}>
-          {/* ✅ Removed "Live Visual Feedback" Hint */}
           
            <div style={{ height: 0 }} /> 
 
@@ -630,7 +616,7 @@ export default function App() {
             <div
               key={i}
               style={{
-                width: 12, // slightly thinner
+                width: 12, 
                 height: CELL_SIZE,
                 display: "flex",
                 flexDirection: "column",
