@@ -2,8 +2,9 @@ import React, { useEffect, useState, useRef } from "react"
 
 const TRACKS = 8
 const STEPS = 16
-const STEP_GAP = 4
-const CELL_SIZE = 28
+// ✅ Scaled down for 1080p fit
+const STEP_GAP = 2 
+const CELL_SIZE = 22 
 
 export default function App() {
   const [grid, setGrid] = useState(() =>
@@ -24,27 +25,23 @@ export default function App() {
   const [userSamples, setUserSamples] = useState({})
   const [unlocked, setUnlocked] = useState(false)
   
-  // New State for Pop-up Hints
   const [showHelp, setShowHelp] = useState(false)
 
   const intervalRef = useRef(null)
   const audioCtxRef = useRef(null)
   const sampleBuffersRef = useRef({})
 
-  // SAFARI SAFE DECODE (global)
   const decode = (arrayBuf) => new Promise((resolve, reject) => {
     audioCtxRef.current.decodeAudioData(arrayBuf, resolve, reject)
   })
 
   const getStepTime = () => (60 / bpm) * 1000 / 4
 
-  // --- SAFARI-SAFE AUDIO INIT ---
   const initAudio = async () => {
     if (!audioCtxRef.current) {
       const AudioContext = window.AudioContext || window.webkitAudioContext
       audioCtxRef.current = new AudioContext()
 
-      // 🔇 Silent "unlock" buffer (some Safari versions need a real sound)
       const ctx = audioCtxRef.current
       const buffer = ctx.createBuffer(1, 1, 22050)
       const source = ctx.createBufferSource()
@@ -57,7 +54,6 @@ export default function App() {
       }
     }
 
-    // If context is suspended (Safari often starts this way)
     if (audioCtxRef.current.state === "suspended") {
       try {
         await audioCtxRef.current.resume()
@@ -141,20 +137,17 @@ export default function App() {
   }, [availableSamples, unlocked])
 
   useEffect(() => {
-    // don't run clock until actually playing AND samples loaded
     if (!isPlaying) {
       clearInterval(intervalRef.current)
       return
     }
 
-    // ✅ block autoplay from sample changes
     if (!unlocked) return
 
     const hasAnySamples =
       samples.some(s => s && sampleBuffersRef.current[s])
 
-
-    if (!hasAnySamples) return // <-- stops auto ticking with no sounds
+    if (!hasAnySamples) return
 
     intervalRef.current = setInterval(() => {
       setStep((prev) => {
@@ -166,27 +159,21 @@ export default function App() {
     return () => clearInterval(intervalRef.current)
   }, [isPlaying, bpm, grid, samples, volumes, muted, pitches, swing, unlocked])
 
-
-  // 1) Only unlock audio — do NOT start transport
   const handleUnlock = () => {
-    // create/resume synchronously in the click
     if (!audioCtxRef.current) {
       const AudioContext = window.AudioContext || window.webkitAudioContext
       audioCtxRef.current = new AudioContext()
     }
     if (audioCtxRef.current.state === "suspended") {
-      // resume synchronously (no await)
       audioCtxRef.current.resume()
     }
-    // optional silent-start + extra resume safety
     initAudio()
     setUnlocked(true)
   }
 
-  // 2) Play button toggles transport. If not unlocked yet, unlock first.
   const handlePlayToggle = async () => {
     if (!unlocked) {
-      handleUnlock() // don’t await; keep it in the same tick
+      handleUnlock() 
     }
     setIsPlaying((prev) => !prev)
   }
@@ -205,8 +192,6 @@ export default function App() {
     setShowSaveToast(true)
     setTimeout(() => setShowSaveToast(false), 2000)
 
-    // --- NEW: Signal Parent Window (Framer) ---
-    // This tells the main site to complete the quest
     if (window.parent) {
       window.parent.postMessage({
         type: "QUEST_TRIGGER",
@@ -243,17 +228,15 @@ export default function App() {
 
   const themeStyles = colors[theme]
 
-  // --- INTERNAL COMPONENTS ---
-
   const SectionTitle = ({ children }) => (
     <div style={{
-      fontSize: 12,
+      fontSize: 10, // Smaller font
       fontWeight: 'bold',
       color: themeStyles.text,
       borderBottom: `2px solid ${themeStyles.highlight}`,
-      paddingBottom: 4,
-      marginBottom: 12,
-      marginTop: 20,
+      paddingBottom: 2,
+      marginBottom: 8,
+      marginTop: 12, // Reduced margin
       textTransform: 'uppercase',
       letterSpacing: 2,
       width: 'fit-content'
@@ -272,7 +255,7 @@ export default function App() {
         color: themeStyles.highlight,
         padding: '6px 8px',
         fontSize: '8px',
-        zIndex: 200, // Increased z-index
+        zIndex: 200,
         pointerEvents: 'none',
         maxWidth: '140px',
         lineHeight: '1.4',
@@ -297,9 +280,7 @@ export default function App() {
         margin: "auto",
         padding: 20,
         boxSizing: "border-box",
-        // ✅ CHANGED: allow vertical scrolling if content is too tall
-        overflowY: "auto",
-        overflowX: "hidden", 
+        overflow: "hidden", // ✅ Fixed: No scrolling
         position: "relative",
       }}
     >
@@ -308,15 +289,15 @@ export default function App() {
       </style>
 
       {/* TOP BAR */}
-      <div style={{ marginBottom: 16, display: "flex", alignItems: "center", gap: 12, position: 'relative' }}>
+      <div style={{ marginBottom: 12, display: "flex", alignItems: "center", gap: 12, position: 'relative' }}>
         <button
           onClick={handlePlayToggle}
           style={{
             background: themeStyles.highlight,
             color: themeStyles.bg,
             fontWeight: "bold",
-            fontSize: 12,
-            padding: "8px 16px",
+            fontSize: 10, // Smaller
+            padding: "6px 12px",
             border: "2px solid " + themeStyles.text,
             cursor: "pointer",
           }}
@@ -324,18 +305,18 @@ export default function App() {
           {isPlaying ? "STOP" : "PLAY"}
         </button>
 
-        <label style={{ fontSize: 10 }}>BPM:</label>
+        <label style={{ fontSize: 8 }}>BPM:</label>
         <input
           type="number"
           value={bpm}
           onChange={(e) => setBpm(Number(e.target.value))}
           style={{
-            width: 60,
-            padding: "4px 8px",
+            width: 50,
+            padding: "4px",
             background: "#000",
             border: "1px solid " + themeStyles.text,
             color: themeStyles.text,
-            fontSize: 10,
+            fontSize: 8,
           }}
         />
 
@@ -346,7 +327,7 @@ export default function App() {
             border: "2px solid " + themeStyles.text,
             background: "transparent",
             color: themeStyles.text,
-            fontSize: 10,
+            fontSize: 8,
           }}
         >
           Save
@@ -359,7 +340,7 @@ export default function App() {
             border: "2px solid " + themeStyles.text,
             background: "transparent",
             color: themeStyles.text,
-            fontSize: 10,
+            fontSize: 8,
           }}
         >
           Load
@@ -389,39 +370,38 @@ export default function App() {
             reader.readAsArrayBuffer(file)
           }}
           style={{
-            padding: 6,
-            fontSize: 10,
+            padding: 4,
+            fontSize: 8,
             color: themeStyles.text,
             background: themeStyles.bg,
             border: "1px solid " + themeStyles.text,
             marginLeft: 8,
+            maxWidth: 150
           }}
         />
 
-        {/* Theme Toggle */}
         <button
           onClick={() => setTheme((prev) => (prev === "synthwave" ? "crt" : "synthwave"))}
           style={{
             marginLeft: "auto",
-            width: 40,
-            height: 40,
+            width: 32,
+            height: 32,
             border: "2px solid " + themeStyles.text,
             background: "linear-gradient(135deg, #0f0, #f0f)",
             cursor: "pointer",
           }}
         />
 
-        {/* HELP TOGGLE */}
         <button
           onClick={() => setShowHelp(!showHelp)}
           style={{
-            width: 40,
-            height: 40,
+            width: 32,
+            height: 32,
             border: "2px solid " + themeStyles.text,
             background: showHelp ? themeStyles.text : "transparent",
             color: showHelp ? themeStyles.bg : themeStyles.text,
             cursor: "pointer",
-            fontSize: 16,
+            fontSize: 14,
             fontWeight: "bold"
           }}
           title="Toggle Hints"
@@ -429,24 +409,24 @@ export default function App() {
           ?
         </button>
 
-        <Hint style={{ top: 50, left: 10 }}>Start/Stop, Set Speed (BPM)</Hint>
-        <Hint style={{ top: 50, left: 300 }}>Save/Load beats to local storage</Hint>
-        <Hint style={{ top: 50, right: 60 }}>Switch Visual Theme</Hint>
-
+        <Hint style={{ top: 40, left: 10 }}>Start/Stop, Set Speed (BPM)</Hint>
+        <Hint style={{ top: 40, left: 300 }}>Save/Load beats to local storage</Hint>
+        <Hint style={{ top: 40, right: 60 }}>Change Theme</Hint>
       </div>
 
       <SectionTitle>MIXER</SectionTitle>
 
       {/* Track Controls */}
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 16, marginBottom: 10, position: 'relative' }}>
-        {/* ✅ MOVED HINT: Higher up (top: -45) and further right (left: 260) to avoid overlapping Track 1 */}
-        <Hint style={{ top: -45, left: 260, zIndex: 200, width: 200 }}>
-          Change Samples, Volume, Pitch, or add Swing to individual tracks here.
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 8, position: 'relative' }}>
+        
+        {/* ✅ MOVED HINT: To bottom right of screen (fixed position relative to container) */}
+        <Hint style={{ position: 'fixed', bottom: 80, right: 80, zIndex: 200, width: 220 }}>
+          Mixer Tip: Change Samples, Volume, Pitch, or add Swing to individual tracks.
         </Hint>
 
         {samples.map((sample, i) => (
-          <div key={i} style={{ width: 220 }}>
-            <div style={{ fontSize: 10, marginBottom: 4 }}>Track {i + 1}</div>
+          <div key={i} style={{ width: 160 }}> {/* ✅ Reduced width from 220 to 160 */}
+            <div style={{ fontSize: 8, marginBottom: 2 }}>Track {i + 1}</div>
 
             <select
               value={sample}
@@ -454,17 +434,12 @@ export default function App() {
                 const newSamples = [...samples]
                 newSamples[i] = e.target.value
                 setSamples(newSamples)
-
-                // ✅ Fix: Ensure AudioContext exists
                 if (!audioCtxRef.current) {
                   const AudioContext = window.AudioContext || window.webkitAudioContext
                   audioCtxRef.current = new AudioContext()
                 }
-
                 if (!sampleBuffersRef.current[e.target.value] && e.target.value) {
-                  // Skip fetch if it's a user-uploaded sample
                   if (userSamples[e.target.value]) return
-
                   try {
                     const res = await fetch(`/${e.target.value}`)
                     const buf = await res.arrayBuffer()
@@ -474,26 +449,24 @@ export default function App() {
                     console.error("Failed to load sample:", err)
                   }
                 }
-
               }}
-
               style={{
                 width: "100%",
-                padding: 4,
+                padding: 2,
+                fontSize: 8, // Smaller font
                 background: "#111",
                 color: themeStyles.text,
                 fontFamily: "inherit",
               }}
             >
               {[...availableSamples, ...Object.keys(userSamples)].map((file) => (
-
                 <option key={file} value={file}>
                   {file.replace(/\.(mp3|wav)/, "").toUpperCase()}
                 </option>
               ))}
             </select>
 
-            <div style={{ fontSize: 10, marginTop: 6 }}>Volume</div>
+            <div style={{ fontSize: 8, marginTop: 4 }}>Vol</div>
             <input
               type="range"
               min="0"
@@ -505,10 +478,10 @@ export default function App() {
                 newVolumes[i] = parseFloat(e.target.value)
                 setVolumes(newVolumes)
               }}
-              style={{ width: "100%" }}
+              style={{ width: "100%", height: 10 }}
             />
 
-            <div style={{ fontSize: 10, marginTop: 6 }}>Pitch</div>
+            <div style={{ fontSize: 8, marginTop: 4 }}>Pitch</div>
             <input
               type="range"
               min="0.5"
@@ -520,11 +493,11 @@ export default function App() {
                 newPitches[i] = parseFloat(e.target.value)
                 setPitches(newPitches)
               }}
-              style={{ width: "100%" }}
+              style={{ width: "100%", height: 10 }}
             />
 
-            <div style={{ marginTop: 6 }}>
-              <label style={{ fontSize: 10 }}>
+            <div style={{ marginTop: 4 }}>
+              <label style={{ fontSize: 8 }}>
                 <input
                   type="checkbox"
                   checked={swing[i]}
@@ -546,12 +519,13 @@ export default function App() {
                 setMuted(newMuted)
               }}
               style={{
-                marginTop: 4,
+                marginTop: 2,
                 width: "100%",
                 background: muted[i] ? "#444" : themeStyles.highlight,
                 color: muted[i] ? "#aaa" : themeStyles.bg,
                 border: "2px solid #000",
-                fontSize: 10,
+                fontSize: 8,
+                padding: 2
               }}
             >
               {muted[i] ? "MUTED" : "MUTE"}
@@ -562,18 +536,15 @@ export default function App() {
 
       <SectionTitle>SEQUENCE GRID</SectionTitle>
 
-      {/* Sequencer Grid & VU Meters */}
-      <div style={{ display: "flex", overflow: "visible", marginTop: 20 }}>
+      <div style={{ display: "flex", overflow: "visible", marginTop: 10 }}>
         
-        {/* ✅ NEW: Row Labels (Track Numbers) */}
         <div style={{ 
           display: 'flex', 
           flexDirection: 'column', 
-          marginRight: 8, 
-          paddingTop: 0 // Align with grid top
+          marginRight: 6, 
+          paddingTop: 0 
         }}>
-           {/* Spacer to align with column numbers */}
-           <div style={{ height: 20 }} /> 
+           <div style={{ height: 12 }} /> 
            {Array(TRACKS).fill(0).map((_, i) => (
              <div key={`row-label-${i}`} style={{
                 height: CELL_SIZE,
@@ -590,29 +561,26 @@ export default function App() {
            ))}
         </div>
 
-        {/* The Grid Container */}
-        {/* ✅ CHANGED: Added explicit height to prevent 0px height collapse due to absolute children */}
         <div style={{ 
           position: "relative", 
           width: STEPS * (CELL_SIZE + STEP_GAP),
           height: TRACKS * (CELL_SIZE + STEP_GAP) 
         }}>
           
-          <Hint style={{ top: -50, left: 150, zIndex: 150 }}>
-            Click cells to program the beat. Horizontal = Time, Vertical = Track.
+          <Hint style={{ top: -40, left: 150, zIndex: 150 }}>
+            Click cells to program the beat.
           </Hint>
 
-          {/* Step Numbers Header */}
           {Array(STEPS).fill(0).map((_, i) => (
             <div
               key={`num-${i}`}
               style={{
                 position: "absolute",
-                top: -15, // Sit above the cells
+                top: -12,
                 left: i * (CELL_SIZE + STEP_GAP),
                 width: CELL_SIZE,
                 textAlign: "center",
-                fontSize: 8,
+                fontSize: 7,
                 color: themeStyles.text,
                 opacity: 0.7
               }}
@@ -621,7 +589,6 @@ export default function App() {
             </div>
           ))}
 
-          {/* Grid Cells */}
           {grid.map((row, rowIndex) =>
             row.map((isActive, colIndex) => {
               const isCurrent = colIndex === step
@@ -654,17 +621,16 @@ export default function App() {
         </div>
 
         {/* VU Meters */}
-        <div style={{ marginLeft: 24, display: "flex", flexDirection: "column", gap: STEP_GAP, position: 'relative' }}>
-          <Hint style={{ right: 30, top: -20, width: 80 }}>Live visual feedback</Hint>
+        <div style={{ marginLeft: 16, display: "flex", flexDirection: "column", gap: STEP_GAP, position: 'relative' }}>
+          {/* ✅ Removed "Live Visual Feedback" Hint */}
           
-          {/* Spacer to align with grid rows (skipping column header space) */}
            <div style={{ height: 0 }} /> 
 
           {triggeredSteps.map((active, i) => (
             <div
               key={i}
               style={{
-                width: 16,
+                width: 12, // slightly thinner
                 height: CELL_SIZE,
                 display: "flex",
                 flexDirection: "column",
@@ -713,11 +679,10 @@ export default function App() {
           Pattern Saved!
         </div>
       )}
-      <div style={{ fontSize: 10, marginTop: 10 }}>
+      <div style={{ fontSize: 8, marginTop: 10 }}>
         Entropy Records Sequencer V1
       </div>
 
-      {/* ✅ Proper JSX comment, not a block comment */}
       <div
         style={{
           position: "absolute",
@@ -726,7 +691,7 @@ export default function App() {
           display: "flex",
           flexDirection: "column",
           alignItems: "flex-end",
-          fontSize: 8,
+          fontSize: 7,
           color: themeStyles.text,
           opacity: 0.8,
         }}
@@ -736,8 +701,8 @@ export default function App() {
             <div
               key={i}
               style={{
-                width: 10,
-                height: 10,
+                width: 8,
+                height: 8,
                 borderRadius: "50%",
                 background: Math.random() > 0.5 ? themeStyles.highlight : "#222",
                 boxShadow: "0 0 4px " + themeStyles.highlight,
@@ -749,10 +714,7 @@ export default function App() {
         <div style={{ marginTop: 6 }}>SYS DIAG OK</div>
         <div>MODEL: DX8-TRK</div>
       </div>
-      {/* Audio unlock overlay */}
       {!unlocked && (
-
-
         <div
           onClick={handleUnlock}
           style={{
